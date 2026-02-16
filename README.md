@@ -1,6 +1,6 @@
 # boss-skill
 
-BMAD 全自动项目编排 Skill，适用于 [OpenClaw](https://github.com/openclaw/openclaw) Agent。
+BMAD 全自动项目编排 Skill，适用于所有支持 Skill 的 Coding Agent（Claude Code、OpenClaw、Cursor、Windsurf 等）。
 
 从需求到部署的完整研发流水线，编排 9 个专业 Agent 自动完成完整研发周期。
 
