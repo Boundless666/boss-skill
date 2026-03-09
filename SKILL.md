@@ -60,13 +60,12 @@ Copy this checklist and check off items as you complete them:
 
 - [ ] **阶段 3: 开发 + 持续验证**
   - [ ] 3.1 读取阶段 2 产物
-  - [ ] 3.2 根据任务类型调用开发 Agent（全栈项目前后端**并行执行**）：
+  - [ ] 3.2 Load `references/testing-standards.md`，根据任务类型调用开发 Agent（全栈项目前后端**并行执行**），将测试标准作为上下文传入：
     - 前端 → Load `agents/boss-frontend.md`
     - 后端 → Load `agents/boss-backend.md`
-  - [ ] 3.3 Load `references/testing-standards.md` → 编写完整测试套件
-  - [ ] 3.4 Load `agents/boss-qa.md` → 执行全套测试
-  - [ ] 3.5 🚦 质量门禁检查 — Load `references/quality-gate.md`
-  - [ ] 3.6 💾 保存产物：`qa-report.md`
+  - [ ] 3.3 Load `agents/boss-qa.md` → 执行全套测试
+  - [ ] 3.4 🚦 质量门禁检查 — Load `references/quality-gate.md`
+  - [ ] 3.5 💾 保存产物：`qa-report.md`
 
 - [ ] **阶段 4: 部署 + 交付**（除非 `--skip-deploy`）
   - [ ] 4.1 读取阶段 3 产物
