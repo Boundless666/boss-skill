@@ -101,6 +101,7 @@ fi
 # 创建目录结构
 info "创建目录: $TARGET_DIR"
 mkdir -p "$TARGET_DIR"
+mkdir -p "$TARGET_DIR/.meta"
 
 # 获取当前日期
 DATE=$(date +%Y-%m-%d)
@@ -213,6 +214,31 @@ cat > "$TARGET_DIR/deploy-report.md" << EOF
 
 EOF
 
+# 执行追踪元数据
+cat > "$TARGET_DIR/.meta/execution.json" << EOF
+{
+  "feature": "$FEATURE_NAME",
+  "createdAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "parameters": {
+    "skipUI": false,
+    "skipDeploy": false,
+    "quick": false
+  },
+  "stages": {
+    "1": { "status": "pending", "startTime": null, "endTime": null },
+    "2": { "status": "pending", "startTime": null, "endTime": null },
+    "3": { "status": "pending", "startTime": null, "endTime": null },
+    "4": { "status": "pending", "startTime": null, "endTime": null }
+  },
+  "qualityGates": {
+    "gate0": null,
+    "gate1": null,
+    "gate2": null
+  },
+  "humanInterventions": []
+}
+EOF
+
 # 完成
 success "Boss Mode 项目目录初始化完成！"
 echo ""
@@ -224,6 +250,8 @@ echo "  ├── ui-spec.md"
 echo "  ├── tech-review.md"
 echo "  ├── tasks.md"
 echo "  ├── qa-report.md"
-echo "  └── deploy-report.md"
+echo "  ├── deploy-report.md"
+echo "  └── .meta/"
+echo "      └── execution.json"
 echo ""
 echo "下一步：运行 /boss 开始开发流程"

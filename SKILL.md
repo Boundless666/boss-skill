@@ -25,6 +25,16 @@ user-invocable: true
 | `--skip-ui` | 跳过 UI 设计阶段（纯 API/CLI 项目） |
 | `--skip-deploy` | 跳过部署阶段（只开发不部署） |
 | `--quick` | 跳过所有确认节点，全自动执行 |
+| `--continue-from <1-4>` | 从指定阶段继续，跳过已完成阶段（需 `.boss/<feature>/` 产物已存在） |
+| `--hitl-level <level>` | 人机协作级别：`auto`（仅关键节点，默认）/ `interactive`（所有决策）/ `off`（等同 --quick） |
+| `--roles <preset>` | 角色预设：`full`（全部 9 个，默认）/ `core`（PM、Architect、Dev、QA） |
+
+## 角色预设
+
+| 预设 | 包含角色 | 适用场景 |
+|------|---------|---------|
+| `full`（默认） | PM、Architect、UI Designer、Tech Lead、Scrum Master、Frontend、Backend、QA、DevOps | 完整项目，质量优先 |
+| `core` | PM、Architect、Frontend/Backend、QA | 快速迭代，跳过 UI/评审/拆解层 |
 
 ## 语言规则
 
@@ -45,6 +55,7 @@ Copy this checklist and check off items as you complete them:
   - [ ] 0.4 确认需求理解 → 向用户确认
 
 - [ ] **阶段 1: 规划（需求穿透 → 设计）**
+  - [ ] 1.0 ⏩ 检查点：若 `--continue-from 2+` 且 `prd.md` / `architecture.md` 已存在，跳过本阶段
   - [ ] 1.1 Load `agents/boss-pm.md` → 调用 PM Agent 进行需求穿透
   - [ ] 1.2~1.3 **并行执行**（同时调用以下两个 Agent，无需等待其中一个完成）：
     - Load `agents/boss-architect.md` → Architect Agent 设计架构
@@ -54,12 +65,14 @@ Copy this checklist and check off items as you complete them:
   - [ ] 1.6 确认规划结果 ⚠️ REQUIRED (除非 `--quick`)
 
 - [ ] **阶段 2: 评审 + 任务拆解**
+  - [ ] 2.0 ⏩ 检查点：若 `--continue-from 3+` 且 `tech-review.md` / `tasks.md` 已存在，跳过本阶段
   - [ ] 2.1 读取阶段 1 产物
   - [ ] 2.2 Load `agents/boss-tech-lead.md` → 技术评审
   - [ ] 2.3 Load `agents/boss-scrum-master.md` → 任务拆解 + 测试用例定义
   - [ ] 2.4 💾 保存产物：`tech-review.md`, `tasks.md`
 
 - [ ] **阶段 3: 开发 + 持续验证**
+  - [ ] 3.0 ⏩ 检查点：若 `--continue-from 4` 且 `qa-report.md` 已存在且门禁通过，跳过本阶段
   - [ ] 3.1 读取阶段 2 产物
   - [ ] 3.2 Load `references/testing-standards.md`，根据任务类型调用开发 Agent（全栈项目前后端**并行执行**），将测试标准作为上下文传入：
     - 前端 → Load `agents/boss-frontend.md`
@@ -111,6 +124,10 @@ Copy this checklist and check off items as you complete them:
 ```
 
 **并行调用**：需要同时执行多个 Agent 时（如阶段 1 的 Architect + UI Designer、阶段 3 的 Frontend + Backend），在同一步骤内同时发起多个子 Agent 调用，无需等待其中一个完成再启动另一个。
+
+**重试机制**：若子 Agent 执行失败，自动重试最多 2 次；若仍失败，暂停并向用户报告失败原因及已完成的产物路径。
+
+**摘要优先**：读取上游产物时，优先读取文档开头的 `## 摘要` section；仅在需要细节时读取完整内容，以节省 Token。
 
 ## 产物目录结构
 
