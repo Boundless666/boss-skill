@@ -1,7 +1,7 @@
 ---
 name: boss
-description: "BMAD 全自动项目编排 Skill。从需求到部署的完整研发流水线，编排多个专业 Agent（PM、架构师、UI 设计师、Tech Lead、Scrum Master、开发者、QA、DevOps）自动完成完整研发周期。当用户说 'boss mode'、'/boss'、'全自动开发'、'从需求到部署'、'帮我做一个'、'build this'、'ship it'、'全流程'、'自动化开发'、'一键开发'、'start a project'、'new feature' 时使用。适用于新项目搭建或现有代码库添加功能。"
-argument-hint: "[需求描述] [--skip-ui] [--skip-deploy] [--quick]"
+description: "BMAD 全自动项目编排 Skill。从需求到部署的完整研发流水线，编排多个专业 Agent（PM、架构师、UI 设计师、Tech Lead、Scrum Master、开发者、QA、DevOps）自动完成完整研发周期。当用户说 'boss mode'、'/boss'、'全自动开发'、'从需求到部署'、'帮我做一个'、'build this'、'ship it'、'全流程'、'自动化开发'、'一键开发'、'start a project'、'new feature' 时使用。适用于新项目搭建或现有代码库添加功能，也支持导出项目级文档模板。"
+argument-hint: "[需求描述] [--skip-ui] [--skip-deploy] [--quick] [--template]"
 user-invocable: true
 ---
 
@@ -25,6 +25,7 @@ user-invocable: true
 | `--skip-ui` | 跳过 UI 设计阶段（纯 API/CLI 项目） |
 | `--skip-deploy` | 跳过部署阶段（只开发不部署） |
 | `--quick` | 跳过所有确认节点，全自动执行 |
+| `--template` | 初始化项目级模板目录（`.boss/templates/`）并暂停流水线，供用户先修改模板 |
 | `--continue-from <1-4>` | 从指定阶段继续，跳过已完成阶段（需 `.boss/<feature>/` 产物已存在） |
 | `--hitl-level <level>` | 人机协作级别：`auto`（仅关键节点，默认）/ `interactive`（所有决策）/ `off`（等同 --quick） |
 | `--roles <preset>` | 角色预设：`full`（全部 9 个，默认）/ `core`（PM、Architect、Dev、QA） |
@@ -47,6 +48,12 @@ user-invocable: true
 Copy this checklist and check off items as you complete them:
 
 ### Boss Pipeline Progress:
+
+- [ ] **Step -1: 模板初始化**（若传入 `--template`）
+  - [ ] -1.1 调用 `scripts/init-project.sh <feature-name> --template`
+  - [ ] -1.2 确认 `.boss/templates/` 已创建，并包含默认模板副本
+  - [ ] -1.3 提示用户先修改模板，再重新运行 `/boss ...`
+  - [ ] -1.4 ⛔ 本次执行到此结束，不进入阶段 1-4
 
 - [ ] **Step 0: 需求收集** ⚠️ REQUIRED (除非 `--quick`)
   - [ ] 0.1 问自己：**这是新项目还是现有代码库？** 如果现有，先探索代码结构
@@ -136,6 +143,7 @@ Copy this checklist and check off items as you complete them:
 ## 产物目录结构
 
 ```
+.boss/templates/         # 项目级模板（可选，优先于内置 templates/）
 .boss/<feature-name>/
 ├── prd.md              # 阶段 1
 ├── architecture.md     # 阶段 1
@@ -160,3 +168,14 @@ Copy this checklist and check off items as you complete them:
 ```
 
 获取信息后，立即开始四阶段流水线。
+
+如果用户使用 `--template`，则不要进入四阶段流水线，只执行模板初始化并返回：
+
+```
+已初始化项目级模板目录：
+- .boss/templates/prd.md.template
+- .boss/templates/architecture.md.template
+- ...
+
+请先按团队规范修改这些模板，再重新运行 /boss 开始开发。
+```

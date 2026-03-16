@@ -1,6 +1,6 @@
 #!/bin/bash
 # Boss Mode - 项目初始化脚本
-# 用途：初始化 .boss/<feature>/ 目录结构
+# 用途：初始化 .boss/<feature>/ 目录结构，并按需初始化项目级模板目录
 
 set -e
 
@@ -22,10 +22,12 @@ show_help() {
     echo ""
     echo "选项:"
     echo "  -h, --help      显示帮助信息"
+    echo "  -t, --template  初始化项目级模板目录（.boss/templates）"
     echo "  -f, --force     强制覆盖已存在的目录"
     echo ""
     echo "示例:"
     echo "  $0 user-auth"
+    echo "  $0 user-auth --template"
     echo "  $0 todo-app --force"
 }
 
@@ -50,12 +52,67 @@ error() {
 # 解析参数
 FEATURE_NAME=""
 FORCE=false
+INIT_TEMPLATES=false
+SKIP_FEATURE_BOOTSTRAP=false
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+DEFAULT_TEMPLATE_DIR="$REPO_ROOT/templates"
+PROJECT_TEMPLATE_DIR=".boss/templates"
+
+init_templates() {
+    if [[ ! -d "$DEFAULT_TEMPLATE_DIR" ]]; then
+        error "未找到内置模板目录: $DEFAULT_TEMPLATE_DIR"
+    fi
+
+    if [[ -d "$PROJECT_TEMPLATE_DIR" ]]; then
+        if [[ "$FORCE" == true ]]; then
+            warn "模板目录已存在，将被覆盖: $PROJECT_TEMPLATE_DIR"
+            rm -rf "$PROJECT_TEMPLATE_DIR"
+        else
+            error "模板目录已存在: '$PROJECT_TEMPLATE_DIR'. 为避免覆盖，已停止初始化。你可以先删除 templates 目录后重试。"
+        fi
+    fi
+
+    info "初始化项目级模板目录: $PROJECT_TEMPLATE_DIR"
+    mkdir -p "$PROJECT_TEMPLATE_DIR"
+
+    while IFS= read -r template_path; do
+        local_rel_path="${template_path#$DEFAULT_TEMPLATE_DIR/}"
+        target_path="$PROJECT_TEMPLATE_DIR/$local_rel_path"
+
+        mkdir -p "$(dirname "$target_path")"
+
+        cp "$template_path" "$target_path"
+        info "写入模板: $target_path"
+    done < <(find "$DEFAULT_TEMPLATE_DIR" -type f -name '*.template' | sort)
+
+    cat > "$PROJECT_TEMPLATE_DIR/README.md" << EOF
+# Boss 项目模板说明
+
+此目录中的模板会覆盖 Skill 内置模板。
+
+模板查找优先级：
+1. \`.boss/templates/<name>.template\`
+2. Skill 内置 \`templates/<name>.template\`
+
+建议：
+- 保留 \`## 摘要\` section，方便下游 Agent 摘要优先读取
+- 保留核心文件名（如 \`prd.md\`、\`tasks.md\`），避免破坏流水线约定
+- 可以根据团队规范自由调整章节结构、字段顺序和文案风格
+EOF
+
+    success "项目级模板初始化完成"
+}
 
 while [[ $# -gt 0 ]]; do
     case $1 in
         -h|--help)
             show_help
             exit 0
+            ;;
+        -t|--template)
+            INIT_TEMPLATES=true
+            shift
             ;;
         -f|--force)
             FORCE=true
@@ -85,6 +142,16 @@ if [[ ! "$FEATURE_NAME" =~ ^[a-z0-9][a-z0-9-]*[a-z0-9]$ ]] && [[ ! "$FEATURE_NAM
     error "功能名称格式无效（仅允许小写字母、数字和连字符，不能以连字符开头或结尾）"
 fi
 
+# 初始化项目级模板
+if [[ "$INIT_TEMPLATES" == true ]]; then
+    init_templates
+    echo ""
+    echo "模板目录："
+    echo "  $PROJECT_TEMPLATE_DIR/"
+    echo "你可以先修改模板，再运行 /boss 或重新执行初始化脚本。"
+    echo ""
+fi
+
 # 目标目录
 TARGET_DIR=".boss/$FEATURE_NAME"
 
@@ -93,21 +160,25 @@ if [[ -d "$TARGET_DIR" ]]; then
     if [[ "$FORCE" == true ]]; then
         warn "目录已存在，将被覆盖: $TARGET_DIR"
         rm -rf "$TARGET_DIR"
+    elif [[ "$INIT_TEMPLATES" == true ]]; then
+        warn "目录已存在，将保留现有产物: $TARGET_DIR"
+        SKIP_FEATURE_BOOTSTRAP=true
     else
         error "目录已存在: $TARGET_DIR（使用 --force 覆盖）"
     fi
 fi
 
-# 创建目录结构
-info "创建目录: $TARGET_DIR"
-mkdir -p "$TARGET_DIR"
-mkdir -p "$TARGET_DIR/.meta"
+if [[ "$SKIP_FEATURE_BOOTSTRAP" != true ]]; then
+    # 创建目录结构
+    info "创建目录: $TARGET_DIR"
+    mkdir -p "$TARGET_DIR"
+    mkdir -p "$TARGET_DIR/.meta"
 
-# 获取当前日期
-DATE=$(date +%Y-%m-%d)
+    # 获取当前日期
+    DATE=$(date +%Y-%m-%d)
 
-# 创建占位文件
-info "创建占位文件..."
+    # 创建占位文件
+    info "创建占位文件..."
 
 # PRD 占位
 cat > "$TARGET_DIR/prd.md" << EOF
@@ -239,19 +310,29 @@ cat > "$TARGET_DIR/.meta/execution.json" << EOF
 }
 EOF
 
-# 完成
-success "Boss Mode 项目目录初始化完成！"
-echo ""
-echo "目录结构："
-echo "  $TARGET_DIR/"
-echo "  ├── prd.md"
-echo "  ├── architecture.md"
-echo "  ├── ui-spec.md"
-echo "  ├── tech-review.md"
-echo "  ├── tasks.md"
-echo "  ├── qa-report.md"
-echo "  ├── deploy-report.md"
-echo "  └── .meta/"
-echo "      └── execution.json"
-echo ""
-echo "下一步：运行 /boss 开始开发流程"
+    # 完成
+    success "Boss Mode 项目目录初始化完成！"
+    echo ""
+    echo "目录结构："
+    echo "  $TARGET_DIR/"
+    echo "  ├── prd.md"
+    echo "  ├── architecture.md"
+    echo "  ├── ui-spec.md"
+    echo "  ├── tech-review.md"
+    echo "  ├── tasks.md"
+    echo "  ├── qa-report.md"
+    echo "  ├── deploy-report.md"
+    echo "  └── .meta/"
+    echo "      └── execution.json"
+    echo ""
+else
+    info "跳过 feature 初始化，继续保留现有目录内容: $TARGET_DIR"
+    echo ""
+fi
+
+if [[ "$INIT_TEMPLATES" == true ]]; then
+    echo "下一步：先修改 .boss/templates/ 中的模板，再运行 /boss 开始开发流程"
+else
+    echo "提示：如需自定义文档模板，可先运行 $0 <feature-name> --template"
+    echo "下一步：运行 /boss 开始开发流程"
+fi
