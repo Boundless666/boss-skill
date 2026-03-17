@@ -23,3 +23,4 @@ Thumbs.db
 
 # Boss generated artifacts
 .boss/
+/dist
