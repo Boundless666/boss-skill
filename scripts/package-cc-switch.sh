@@ -24,6 +24,9 @@ cp -R \
   "$REPO_ROOT/LICENSE" \
   "$SKILL_DIR/"
 
+# 打包脚本只用于本地构建安装包，不应出现在最终 Skill 包内
+rm -f "$SKILL_DIR/scripts/package-cc-switch.sh"
+
 mkdir -p "$(dirname "$OUTPUT_ZIP")"
 rm -f "$OUTPUT_ZIP"
 
