@@ -320,7 +320,9 @@ skills/boss/
 ├── references/                 # 参考资料
 │   └── bmad-methodology.md
 └── scripts/                    # 辅助脚本
-    └── init-project.sh         # 项目初始化
+    ├── init-project.sh         # 项目初始化（创建轻量占位文件）
+    ├── resolve-template.sh     # 模板路径解析
+    └── prepare-artifact.sh     # 按模板优先级准备当前产物骨架
 ```
 
 ### 5.2 产物目录结构
@@ -437,6 +439,7 @@ Boss Skill 支持项目级模板覆盖，以适配团队自己的文档规范。
 
 - 用户可以直接修改项目中的模板副本，无需改动 Skill 仓库默认模板
 - 下游 Agent 必须优先读取项目级模板
+- `scripts/init-project.sh` 只负责初始化轻量占位文件；正式落文前再按模板优先级逐个准备当前产物骨架
 - 无论模板如何自定义，都应保留 `## 摘要` section 作为下游摘要优先读取入口
 
 ---

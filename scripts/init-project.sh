@@ -99,6 +99,10 @@ init_templates() {
 - 保留 \`## 摘要\` section，方便下游 Agent 摘要优先读取
 - 保留核心文件名（如 \`prd.md\`、\`tasks.md\`），避免破坏流水线约定
 - 可以根据团队规范自由调整章节结构、字段顺序和文案风格
+
+说明：
+- \`scripts/init-project.sh\` 只负责初始化轻量占位文件
+- Boss 在真正生成某个产物前，会调用 \`scripts/prepare-artifact.sh\` 按相同优先级准备当前文档骨架
 EOF
 
     success "项目级模板初始化完成"

@@ -35,6 +35,7 @@ info "正在复制技能文件..."
 cp -r "$SRC_DIR/agents" "$TARGET_DIR/"
 cp -r "$SRC_DIR/references" "$TARGET_DIR/"
 cp -r "$SRC_DIR/templates" "$TARGET_DIR/"
+cp -r "$SRC_DIR/scripts" "$TARGET_DIR/"
 cp "$SRC_DIR/SKILL.md" "$TARGET_DIR/"
 
 # 5. 提示
