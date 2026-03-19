@@ -320,13 +320,16 @@ skills/boss/
 ├── references/                 # 参考资料
 │   └── bmad-methodology.md
 └── scripts/                    # 辅助脚本
-    └── init-project.sh         # 项目初始化
+    ├── init-project.sh         # 项目初始化（创建轻量占位文件）
+    ├── resolve-template.sh     # 模板路径解析
+    └── prepare-artifact.sh     # 按模板优先级准备当前产物骨架
 ```
 
 ### 5.2 产物目录结构
 
 ```
 .boss/
+├── templates/            # 项目级模板（可选，优先于内置 templates/）
 ├── <feature-name>/
 │   ├── prd.md              # 产品需求文档（含用户故事）
 │   ├── architecture.md     # 系统架构文档
@@ -361,6 +364,7 @@ Task({
 
 | 阶段 | 执行策略 | 说明 |
 |------|----------|------|
+| 模板初始化 | 条件执行 | 用户传入 `--template` 时，复制内置模板到 `.boss/templates/` 并暂停流水线 |
 | 阶段 1 | 串行 → 并行 | PM 先执行（需求穿透），然后 Architect + UI Designer 并行 |
 | 阶段 2 | 串行 | Tech Lead 评审 → Scrum Master 拆解 |
 | 阶段 3 | 并行 + 循环 | Frontend/Backend 并行开发，QA 持续验证 |
@@ -415,6 +419,28 @@ Boss Skill 的核心设计确保了广泛兼容性：
 2. **通用 Task 调用** - 使用 `general_purpose_task` 而非特定工具 API
 3. **无外部依赖** - 不依赖特定运行时或框架
 4. **模块化设计** - 可按需选用部分 Agent，灵活组合
+
+### 6.5 模板覆盖机制
+
+Boss Skill 支持项目级模板覆盖，以适配团队自己的文档规范。
+
+模板查找顺序：
+
+1. `.boss/templates/<name>.template`
+2. Skill 内置 `templates/<name>.template`
+
+初始化方式：
+
+```bash
+./scripts/init-project.sh <feature-name> --template
+```
+
+设计原则：
+
+- 用户可以直接修改项目中的模板副本，无需改动 Skill 仓库默认模板
+- 下游 Agent 必须优先读取项目级模板
+- `scripts/init-project.sh` 只负责初始化轻量占位文件；正式落文前再按模板优先级逐个准备当前产物骨架
+- 无论模板如何自定义，都应保留 `## 摘要` section 作为下游摘要优先读取入口
 
 ---
 

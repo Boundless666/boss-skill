@@ -1,7 +1,7 @@
 ---
 name: boss
-description: "BMAD 全自动项目编排 Skill。从需求到部署的完整研发流水线，编排多个专业 Agent（PM、架构师、UI 设计师、Tech Lead、Scrum Master、开发者、QA、DevOps）自动完成完整研发周期。当用户说 'boss mode'、'/boss'、'全自动开发'、'从需求到部署'、'帮我做一个'、'build this'、'ship it'、'全流程'、'自动化开发'、'一键开发'、'start a project'、'new feature' 时使用。适用于新项目搭建或现有代码库添加功能。"
-argument-hint: "[需求描述] [--skip-ui] [--skip-deploy] [--quick]"
+description: "BMAD 全自动项目编排 Skill。从需求到部署的完整研发流水线，编排多个专业 Agent（PM、架构师、UI 设计师、Tech Lead、Scrum Master、开发者、QA、DevOps）自动完成完整研发周期。当用户说 'boss mode'、'/boss'、'全自动开发'、'从需求到部署'、'帮我做一个'、'build this'、'ship it'、'全流程'、'自动化开发'、'一键开发'、'start a project'、'new feature' 时使用。适用于新项目搭建或现有代码库添加功能，也支持导出项目级文档模板。"
+argument-hint: "[需求描述] [--skip-ui] [--skip-deploy] [--quick] [--template]"
 user-invocable: true
 ---
 
@@ -25,6 +25,7 @@ user-invocable: true
 | `--skip-ui` | 跳过 UI 设计阶段（纯 API/CLI 项目） |
 | `--skip-deploy` | 跳过部署阶段（只开发不部署） |
 | `--quick` | 跳过所有确认节点，全自动执行 |
+| `--template` | 初始化项目级模板目录（`.boss/templates/`）并暂停流水线，供用户先修改模板 |
 | `--continue-from <1-4>` | 从指定阶段继续，跳过已完成阶段（需 `.boss/<feature>/` 产物已存在） |
 | `--hitl-level <level>` | 人机协作级别：`auto`（仅关键节点，默认）/ `interactive`（所有决策）/ `off`（等同 --quick） |
 | `--roles <preset>` | 角色预设：`full`（全部 9 个，默认）/ `core`（PM、Architect、Dev、QA） |
@@ -48,30 +49,40 @@ Copy this checklist and check off items as you complete them:
 
 ### Boss Pipeline Progress:
 
+- [ ] **Step -1: 模板初始化**（若传入 `--template`）
+  - [ ] -1.1 调用 `scripts/init-project.sh <feature-name> --template`
+  - [ ] -1.2 确认 `.boss/templates/` 已创建，并包含默认模板副本
+  - [ ] -1.3 提示用户先修改模板，再重新运行 `/boss ...`
+  - [ ] -1.4 ⛔ 本次执行到此结束，不进入阶段 1-4
+
 - [ ] **Step 0: 需求收集** ⚠️ REQUIRED (除非 `--quick`)
   - [ ] 0.1 问自己：**这是新项目还是现有代码库？** 如果现有，先探索代码结构
   - [ ] 0.2 问自己：**需要什么类型的界面？**（Web/CLI/API/无界面）
   - [ ] 0.3 问自己：**有什么技术偏好或约束？**
   - [ ] 0.4 确认需求理解 → 向用户确认
+  - [ ] 0.5 若不是 `--continue-from` 且 `.boss/<feature>/` 不存在，调用 `scripts/init-project.sh <feature-name>` 创建占位产物骨架
 
 - [ ] **阶段 1: 规划（需求穿透 → 设计）**
   - [ ] 1.0 ⏩ 检查点：若 `--continue-from 2+` 且 `prd.md` / `architecture.md` 已存在，跳过本阶段
-  - [ ] 1.1 Load `agents/boss-pm.md` → 调用 PM Agent 进行需求穿透
-  - [ ] 1.2~1.3 **并行执行**（同时调用以下两个 Agent，无需等待其中一个完成）：
+  - [ ] 1.1 Load `references/artifact-guide.md` 获取产物保存规范
+  - [ ] 1.2 对本阶段每个产物分别调用 `scripts/prepare-artifact.sh <feature-name> <artifact-name>`，只为当前需要的文档准备模板骨架
+  - [ ] 1.3 Load `agents/boss-pm.md` → 调用 PM Agent 进行需求穿透，并显式传入目标产物路径与已准备骨架
+  - [ ] 1.4~1.5 **并行执行**（同时调用以下两个 Agent，无需等待其中一个完成，并显式传入各自产物目标路径与已准备骨架）：
     - Load `agents/boss-architect.md` → Architect Agent 设计架构
     - Load `agents/boss-ui-designer.md` → UI Agent（除非 `--skip-ui`）
-  - [ ] 1.4 Load `references/artifact-guide.md` 获取产物保存规范
-  - [ ] 1.5 💾 保存产物到 `.boss/<feature>/`：`prd.md`, `architecture.md`, `ui-spec.md`
-  - [ ] 1.6 📝 更新 `.boss/<feature>/.meta/execution.json`：阶段 1 状态改为 `completed`
-  - [ ] 1.6 确认规划结果 ⚠️ REQUIRED (除非 `--quick`)
+  - [ ] 1.6 💾 保存产物到 `.boss/<feature>/`：`prd.md`, `architecture.md`, `ui-spec.md`
+  - [ ] 1.7 📝 更新 `.boss/<feature>/.meta/execution.json`：阶段 1 状态改为 `completed`
+  - [ ] 1.8 确认规划结果 ⚠️ REQUIRED (除非 `--quick`)
 
 - [ ] **阶段 2: 评审 + 任务拆解**
   - [ ] 2.0 ⏩ 检查点：若 `--continue-from 3+` 且 `tech-review.md` / `tasks.md` 已存在，跳过本阶段
   - [ ] 2.1 读取阶段 1 产物
-  - [ ] 2.2 Load `agents/boss-tech-lead.md` → 技术评审
-  - [ ] 2.3 Load `agents/boss-scrum-master.md` → 任务拆解 + 测试用例定义
-  - [ ] 2.4 💾 保存产物：`tech-review.md`, `tasks.md`
-  - [ ] 2.5 📝 更新 `.meta/execution.json`：阶段 2 状态改为 `completed`
+  - [ ] 2.2 Load `references/artifact-guide.md` 获取产物保存规范
+  - [ ] 2.3 对 `tech-review.md`、`tasks.md` 分别调用 `scripts/prepare-artifact.sh <feature-name> <artifact-name>` 准备当前阶段文档骨架
+  - [ ] 2.4 Load `agents/boss-tech-lead.md` → 技术评审
+  - [ ] 2.5 Load `agents/boss-scrum-master.md` → 任务拆解 + 测试用例定义
+  - [ ] 2.6 💾 保存产物：`tech-review.md`, `tasks.md`
+  - [ ] 2.7 📝 更新 `.meta/execution.json`：阶段 2 状态改为 `completed`
 
 - [ ] **阶段 3: 开发 + 持续验证**
   - [ ] 3.0 ⏩ 检查点：若 `--continue-from 4` 且 `qa-report.md` 已存在且门禁通过，跳过本阶段
@@ -79,17 +90,19 @@ Copy this checklist and check off items as you complete them:
   - [ ] 3.2 Load `references/testing-standards.md`，根据任务类型调用开发 Agent（全栈项目前后端**并行执行**），将测试标准作为上下文传入：
     - 前端 → Load `agents/boss-frontend.md`
     - 后端 → Load `agents/boss-backend.md`
-  - [ ] 3.3 Load `agents/boss-qa.md` → 执行全套测试
-  - [ ] 3.4 🚦 质量门禁检查 — Load `references/quality-gate.md`
-  - [ ] 3.5 💾 保存产物：`qa-report.md`
-  - [ ] 3.6 📝 更新 `.meta/execution.json`：阶段 3 状态、质量门禁结果
+  - [ ] 3.3 Load `references/artifact-guide.md` 获取产物保存规范，并调用 `scripts/prepare-artifact.sh <feature-name> qa-report.md`
+  - [ ] 3.4 Load `agents/boss-qa.md` → 执行全套测试，并在已准备骨架上输出 QA 报告
+  - [ ] 3.5 🚦 质量门禁检查 — Load `references/quality-gate.md`
+  - [ ] 3.6 💾 保存产物：`qa-report.md`
+  - [ ] 3.7 📝 更新 `.meta/execution.json`：阶段 3 状态、质量门禁结果
 
 - [ ] **阶段 4: 部署 + 交付**（除非 `--skip-deploy`）
   - [ ] 4.1 读取阶段 3 产物
-  - [ ] 4.2 Load `agents/boss-devops.md` → 构建部署
-  - [ ] 4.3 💾 保存产物：`deploy-report.md`
-  - [ ] 4.4 📝 更新 `.meta/execution.json`：阶段 4 状态、访问 URL
-  - [ ] 4.4 输出最终结果（文档位置 + 测试摘要 + 访问 URL）
+  - [ ] 4.2 Load `references/artifact-guide.md` 获取产物保存规范，并调用 `scripts/prepare-artifact.sh <feature-name> deploy-report.md`
+  - [ ] 4.3 Load `agents/boss-devops.md` → 构建部署，并在已准备骨架上输出部署报告
+  - [ ] 4.4 💾 保存产物：`deploy-report.md`
+  - [ ] 4.5 📝 更新 `.meta/execution.json`：阶段 4 状态、访问 URL
+  - [ ] 4.6 输出最终结果（文档位置 + 测试摘要 + 访问 URL）
 
 ---
 
@@ -127,15 +140,29 @@ Copy this checklist and check off items as you complete them:
 [具体任务描述，包含所需上下文、输入产物路径、输出产物路径]
 ```
 
+如果当前任务会生成文档产物，在 `## 当前任务` 中额外附加：
+
+```
+## 模板上下文
+
+- 当前产物：`.boss/<feature>/<artifact>.md`
+- 产物骨架：已通过 `scripts/prepare-artifact.sh <feature-name> <artifact>.md` 按模板优先级准备完成
+- 执行要求：先读取当前产物文件，再在该骨架基础上填充真实内容
+- 冲突处理：若骨架结构与 Agent Prompt 中的默认输出格式冲突，以骨架/模板为准
+```
+
 **并行调用**：需要同时执行多个 Agent 时（如阶段 1 的 Architect + UI Designer、阶段 3 的 Frontend + Backend），在同一步骤内同时发起多个子 Agent 调用，无需等待其中一个完成再启动另一个。
 
 **重试机制**：若子 Agent 执行失败，自动重试最多 2 次；若仍失败，暂停并向用户报告失败原因及已完成的产物路径。
 
 **摘要优先**：读取上游产物时，优先读取文档开头的 `## 摘要` section；仅在需要细节时读取完整内容，以节省 Token。
 
+**模板落文**：正常执行 `/boss` 时，先用 `scripts/init-project.sh <feature-name>` 创建轻量占位文件；真正写某个文档前，再单独调用 `scripts/prepare-artifact.sh <feature-name> <artifact-name>` 准备当前文档骨架。不要在初始化阶段一次性把全部模板正文落入 `.boss/<feature>/`。
+
 ## 产物目录结构
 
 ```
+.boss/templates/         # 项目级模板（可选，优先于内置 templates/）
 .boss/<feature-name>/
 ├── prd.md              # 阶段 1
 ├── architecture.md     # 阶段 1
@@ -160,3 +187,14 @@ Copy this checklist and check off items as you complete them:
 ```
 
 获取信息后，立即开始四阶段流水线。
+
+如果用户使用 `--template`，则不要进入四阶段流水线，只执行模板初始化并返回：
+
+```
+已初始化项目级模板目录：
+- .boss/templates/prd.md.template
+- .boss/templates/architecture.md.template
+- ...
+
+请先按团队规范修改这些模板，再重新运行 /boss 开始开发。
+```
