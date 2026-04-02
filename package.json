@@ -1,0 +1,55 @@
+{
+  "name": "@blade-ai/boss-skill",
+  "version": "2.0.0",
+  "description": "BMAD Harness Engineer — pluggable pipeline skill for coding agents. Orchestrates 9 specialist agents from requirements to deployment.",
+  "author": {
+    "name": "echoVic",
+    "email": "137844255@qq.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/echoVic/boss-skill",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/echoVic/boss-skill.git"
+  },
+  "bugs": {
+    "url": "https://github.com/echoVic/boss-skill/issues"
+  },
+  "keywords": [
+    "bmad",
+    "harness-engineer",
+    "pipeline",
+    "agent-orchestration",
+    "claude-code",
+    "coding-agent",
+    "skill",
+    "quality-gate",
+    "devops",
+    "automation"
+  ],
+  "files": [
+    "agents/",
+    "commands/",
+    "harness/",
+    "references/",
+    "scripts/",
+    "templates/",
+    ".claude/",
+    ".claude-plugin/",
+    "bin/",
+    "SKILL.md",
+    "DESIGN.md"
+  ],
+  "bin": {
+    "boss-skill": "./bin/boss-skill.js"
+  },
+  "scripts": {
+    "prepublishOnly": "node bin/boss-skill.js --version"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}
