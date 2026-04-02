@@ -1,0 +1,46 @@
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+const { findActiveFeature, readExecJson } = require('../lib/boss-utils');
+
+function run(rawInput) {
+  const input = JSON.parse(rawInput);
+  const stopHookActive = input.stop_hook_active;
+  const cwd = input.cwd || '';
+
+  if (stopHookActive === true || stopHookActive === 'true') {
+    return '';
+  }
+
+  const active = findActiveFeature(cwd);
+  if (!active) return '';
+
+  const execData = readExecJson(cwd, active.feature);
+  if (!execData) return '';
+
+  const pendingStages = [];
+  const stages = execData.stages || {};
+  for (let s = 1; s <= 4; s++) {
+    const stage = stages[String(s)] || {};
+    if (stage.status === 'running') {
+      const sName = stage.name || 'unknown';
+      pendingStages.push(`Stage ${s} (${sName}) is still running`);
+    }
+  }
+
+  if (pendingStages.length === 0) return '';
+
+  let reason = `[Boss Harness] 流水线 '${active.feature}' 有未完成的阶段:\n`;
+  for (const info of pendingStages) {
+    reason += `  - ${info}\n`;
+  }
+  reason += '请先完成当前阶段或使用 update-stage.sh 更新状态后再停止。';
+
+  return JSON.stringify({
+    decision: 'block',
+    reason
+  });
+}
+
+module.exports = { run };

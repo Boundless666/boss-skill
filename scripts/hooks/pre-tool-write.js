@@ -1,0 +1,64 @@
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+const { STAGE_MAP } = require('../lib/boss-utils');
+
+function run(rawInput) {
+  const input = JSON.parse(rawInput);
+  const filePath = (input.tool_input || {}).file_path || '';
+  const cwd = input.cwd || '';
+
+  if (!filePath) return '';
+
+  if (filePath.includes('.boss/') && filePath.endsWith('execution.json')) {
+    return JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'deny',
+        permissionDecisionReason: 'execution.json 由 Harness 脚本管理，不允许直接编辑。请使用 scripts/harness/update-stage.sh'
+      }
+    });
+  }
+
+  if (filePath.includes('.boss/')) {
+    const match = filePath.match(/\.boss\/([^/]+)\//);
+    const artifact = path.basename(filePath);
+
+    if (match) {
+      const feature = match[1];
+      const execJsonPath = path.join(cwd, '.boss', feature, '.meta', 'execution.json');
+
+      if (fs.existsSync(execJsonPath)) {
+        const expectedStage = STAGE_MAP[artifact];
+
+        if (expectedStage !== undefined) {
+          let data;
+          try {
+            data = JSON.parse(fs.readFileSync(execJsonPath, 'utf8'));
+          } catch {
+            return '';
+          }
+
+          const stages = data.stages || {};
+          const stage = stages[String(expectedStage)] || {};
+          const stageStatus = stage.status || 'unknown';
+
+          if (stageStatus !== 'running' && stageStatus !== 'retrying') {
+            return JSON.stringify({
+              hookSpecificOutput: {
+                hookEventName: 'PreToolUse',
+                permissionDecision: 'ask',
+                permissionDecisionReason: `产物 ${artifact} 属于阶段 ${expectedStage}，但该阶段状态为 ${stageStatus}（非 running）。确认要写入吗？`
+              }
+            });
+          }
+        }
+      }
+    }
+  }
+
+  return '';
+}
+
+module.exports = { run };

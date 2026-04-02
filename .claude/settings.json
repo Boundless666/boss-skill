@@ -6,20 +6,24 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/session-start.sh",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/lib/run-with-flags.js\" \"session:start\" \"scripts/hooks/session-start.js\"",
             "timeout": 10
           }
-        ]
+        ],
+        "description": "Load pipeline context and previous session state on startup",
+        "id": "session:start"
       },
       {
         "matcher": "resume",
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/session-resume.sh",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/lib/run-with-flags.js\" \"session:resume\" \"scripts/hooks/session-resume.js\"",
             "timeout": 10
           }
-        ]
+        ],
+        "description": "List unfinished pipelines on session resume",
+        "id": "session:resume"
       }
     ],
 
@@ -29,10 +33,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/pre-tool-write.sh",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/lib/run-with-flags.js\" \"pre:write:artifact-guard\" \"scripts/hooks/pre-tool-write.js\" \"standard,strict\"",
             "timeout": 5
           }
-        ]
+        ],
+        "description": "Protect execution.json and validate stage status before artifact writes",
+        "id": "pre:write:artifact-guard"
       }
     ],
 
@@ -42,20 +48,24 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/post-tool-write.sh",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/lib/run-with-flags.js\" \"post:write:artifact-track\" \"scripts/hooks/post-tool-write.js\" \"standard,strict\"",
             "timeout": 10
           }
-        ]
+        ],
+        "description": "Auto-track artifacts to execution.json after Write operations",
+        "id": "post:write:artifact-track"
       },
       {
         "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/post-tool-bash.sh",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/lib/run-with-flags.js\" \"post:bash:context\" \"scripts/hooks/post-tool-bash.js\" \"standard,strict\"",
             "timeout": 10
           }
-        ]
+        ],
+        "description": "Capture gate/harness/test command execution context",
+        "id": "post:bash:context"
       }
     ],
 
@@ -64,10 +74,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/subagent-start.sh",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/lib/run-with-flags.js\" \"subagent:start\" \"scripts/hooks/subagent-start.js\"",
             "timeout": 5
           }
-        ]
+        ],
+        "description": "Inject pipeline stage context into subagents",
+        "id": "subagent:start"
       }
     ],
 
@@ -76,10 +88,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/subagent-stop.sh",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/lib/run-with-flags.js\" \"subagent:stop\" \"scripts/hooks/subagent-stop.js\"",
             "timeout": 10
           }
-        ]
+        ],
+        "description": "Log subagent execution to agent-log.jsonl",
+        "id": "subagent:stop"
       }
     ],
 
@@ -88,10 +102,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/on-stop.sh",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/lib/run-with-flags.js\" \"stop:pipeline-guard\" \"scripts/hooks/on-stop.js\" \"standard,strict\"",
             "timeout": 30
           }
-        ]
+        ],
+        "description": "Block premature exit when pipeline stages are still running",
+        "id": "stop:pipeline-guard"
       }
     ],
 
@@ -100,11 +116,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/on-notification.sh",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/lib/run-with-flags.js\" \"notification:log\" \"scripts/hooks/on-notification.js\"",
             "async": true,
             "timeout": 5
           }
-        ]
+        ],
+        "description": "Async notification logging to notifications.jsonl",
+        "id": "notification:log"
       }
     ],
 
@@ -113,10 +131,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/session-end.sh",
-            "timeout": 5
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/lib/run-with-flags.js\" \"session:end\" \"scripts/hooks/session-end.js\"",
+            "timeout": 10
           }
-        ]
+        ],
+        "description": "Save session state and generate summary report",
+        "id": "session:end"
       }
     ]
   }

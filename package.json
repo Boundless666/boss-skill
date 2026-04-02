@@ -1,7 +1,7 @@
 {
   "name": "@blade-ai/boss-skill",
-  "version": "2.0.0",
-  "description": "BMAD Harness Engineer — pluggable pipeline skill for coding agents. Orchestrates 9 specialist agents from requirements to deployment.",
+  "version": "3.0.0",
+  "description": "BMAD Harness Engineer — pluggable pipeline skill for coding agents. Brainstorming → 9 specialist agents → quality gates → deployment. Node.js hooks with profile system.",
   "author": {
     "name": "echoVic",
     "email": "137844255@qq.com"
@@ -24,6 +24,9 @@
     "coding-agent",
     "skill",
     "quality-gate",
+    "brainstorming",
+    "hooks",
+    "subagent",
     "devops",
     "automation"
   ],
@@ -34,6 +37,7 @@
     "references/",
     "scripts/",
     "templates/",
+    "skills/",
     ".claude/",
     ".claude-plugin/",
     "bin/",
