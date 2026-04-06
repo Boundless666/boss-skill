@@ -71,7 +71,6 @@ EXEC_JSON=".boss/$FEATURE/.meta/execution.json"
 
 command -v jq >/dev/null 2>&1 || error "需要 jq 工具（brew install jq）"
 
-NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 CURRENT_STATUS=$(jq -r ".stages[\"$STAGE\"].status" "$EXEC_JSON")
 
 validate_transition() {
@@ -90,85 +89,52 @@ if ! validate_transition "$CURRENT_STATUS" "$STATUS"; then
     error "无效的状态转换: $CURRENT_STATUS → $STATUS（阶段 $STAGE）"
 fi
 
-TMP_FILE=$(mktemp)
-trap 'rm -f "$TMP_FILE"' EXIT
+# 事件溯源：追加事件 → 物化状态
+EVENTS_FILE=".boss/$FEATURE/.meta/events.jsonl"
 
-cp "$EXEC_JSON" "$TMP_FILE"
+# 映射 status 到事件类型
+EVENT_TYPE=""
+case "$STATUS" in
+    running)   EVENT_TYPE="StageStarted" ;;
+    completed) EVENT_TYPE="StageCompleted" ;;
+    failed)    EVENT_TYPE="StageFailed" ;;
+    retrying)  EVENT_TYPE="StageRetrying" ;;
+    skipped)   EVENT_TYPE="StageSkipped" ;;
+esac
 
-jq --arg stage "$STAGE" --arg status "$STATUS" --arg now "$NOW" \
-    '.stages[$stage].status = $status | .updatedAt = $now' "$TMP_FILE" > "${TMP_FILE}.out" && mv "${TMP_FILE}.out" "$EXEC_JSON"
-
-if [[ "$STATUS" == "running" ]]; then
-    CURRENT_START=$(jq -r ".stages[\"$STAGE\"].startTime" "$EXEC_JSON")
-    if [[ "$CURRENT_START" == "null" ]]; then
-        jq --arg stage "$STAGE" --arg now "$NOW" \
-            '.stages[$stage].startTime = $now' "$EXEC_JSON" > "$TMP_FILE" && mv "$TMP_FILE" "$EXEC_JSON"
-    fi
+# 追加主事件
+APPEND_ARGS=("$FEATURE" "$EVENT_TYPE" --stage "$STAGE")
+if [[ -n "$REASON" ]]; then
+    APPEND_ARGS+=(--reason "$REASON")
 fi
 
-if [[ "$STATUS" == "completed" || "$STATUS" == "failed" || "$STATUS" == "skipped" ]]; then
-    jq --arg stage "$STAGE" --arg now "$NOW" \
-        '.stages[$stage].endTime = $now' "$EXEC_JSON" > "$TMP_FILE" && mv "$TMP_FILE" "$EXEC_JSON"
+"$SCRIPT_DIR/append-event.sh" "${APPEND_ARGS[@]}"
+
+# 发射进度事件
+PROGRESS_FILE=".boss/$FEATURE/.meta/progress.jsonl"
+PROGRESS_TYPE=""
+case "$STATUS" in
+    running)   PROGRESS_TYPE="stage-start" ;;
+    completed) PROGRESS_TYPE="stage-complete" ;;
+    failed)    PROGRESS_TYPE="stage-failed" ;;
+esac
+if [[ -n "$PROGRESS_TYPE" ]]; then
+    NOW_P="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "{\"timestamp\":\"$NOW_P\",\"type\":\"$PROGRESS_TYPE\",\"data\":{\"stage\":$STAGE}}" >> "$PROGRESS_FILE"
 fi
 
-if [[ "$STATUS" == "failed" && -n "$REASON" ]]; then
-    jq --arg stage "$STAGE" --arg reason "$REASON" \
-        '.stages[$stage].failureReason = $reason' "$EXEC_JSON" > "$TMP_FILE" && mv "$TMP_FILE" "$EXEC_JSON"
-fi
-
-if [[ "$STATUS" == "retrying" ]]; then
-    jq --arg stage "$STAGE" \
-        '.stages[$stage].retryCount += 1 | .metrics.retryTotal += 1' "$EXEC_JSON" > "$TMP_FILE" && mv "$TMP_FILE" "$EXEC_JSON"
-fi
-
+# 追加产物事件
 for artifact in "${ARTIFACTS[@]}"; do
-    jq --arg stage "$STAGE" --arg art "$artifact" \
-        '.stages[$stage].artifacts += [$art] | .stages[$stage].artifacts |= unique' "$EXEC_JSON" > "$TMP_FILE" && mv "$TMP_FILE" "$EXEC_JSON"
+    "$SCRIPT_DIR/append-event.sh" "$FEATURE" ArtifactRecorded --artifact "$artifact" --stage "$STAGE"
 done
 
+# 追加门禁事件
 if [[ -n "$GATE_NAME" && -n "$GATE_PASSED" ]]; then
-    jq --arg stage "$STAGE" --arg gate "$GATE_NAME" --argjson passed "$GATE_PASSED" --arg now "$NOW" \
-        '.stages[$stage].gateResults[$gate] = { "passed": $passed, "executedAt": $now }' "$EXEC_JSON" > "$TMP_FILE" && mv "$TMP_FILE" "$EXEC_JSON"
+    "$SCRIPT_DIR/append-event.sh" "$FEATURE" GateEvaluated --gate "$GATE_NAME" --passed "$GATE_PASSED" --stage "$STAGE"
 fi
 
-ALL_COMPLETED=true
-ALL_COUNT=0
-COMPLETED_COUNT=0
-for s in 1 2 3 4; do
-    S_STATUS=$(jq -r ".stages[\"$s\"].status" "$EXEC_JSON")
-    ALL_COUNT=$((ALL_COUNT + 1))
-    if [[ "$S_STATUS" == "completed" || "$S_STATUS" == "skipped" ]]; then
-        COMPLETED_COUNT=$((COMPLETED_COUNT + 1))
-    else
-        ALL_COMPLETED=false
-    fi
-done
-
-if [[ "$ALL_COMPLETED" == true ]]; then
-    CREATED=$(jq -r '.createdAt' "$EXEC_JSON")
-    jq --arg now "$NOW" --arg status "completed" \
-        '.status = $status | .updatedAt = $now' "$EXEC_JSON" > "$TMP_FILE" && mv "$TMP_FILE" "$EXEC_JSON"
-elif [[ "$STATUS" == "failed" ]]; then
-    jq --arg status "failed" --arg now "$NOW" \
-        '.status = $status | .updatedAt = $now' "$EXEC_JSON" > "$TMP_FILE" && mv "$TMP_FILE" "$EXEC_JSON"
-elif [[ "$STATUS" == "running" ]]; then
-    jq --arg status "running" --arg now "$NOW" \
-        '.status = $status | .updatedAt = $now' "$EXEC_JSON" > "$TMP_FILE" && mv "$TMP_FILE" "$EXEC_JSON"
-fi
-
-for s in 1 2 3 4; do
-    S_START=$(jq -r ".stages[\"$s\"].startTime" "$EXEC_JSON")
-    S_END=$(jq -r ".stages[\"$s\"].endTime" "$EXEC_JSON")
-    if [[ "$S_START" != "null" && "$S_END" != "null" ]]; then
-        START_EPOCH=$(iso_to_epoch "$S_START")
-        END_EPOCH=$(iso_to_epoch "$S_END")
-        if [[ "$START_EPOCH" != "0" && "$END_EPOCH" != "0" ]]; then
-            DURATION=$((END_EPOCH - START_EPOCH))
-            jq --arg s "$s" --argjson d "$DURATION" \
-                '.metrics.stageTimings[$s] = $d' "$EXEC_JSON" > "$TMP_FILE" && mv "$TMP_FILE" "$EXEC_JSON"
-        fi
-    fi
-done
+# 物化状态
+"$SCRIPT_DIR/materialize-state.sh" "$FEATURE"
 
 success "阶段 $STAGE: $CURRENT_STATUS → $STATUS"
 info "文件: $EXEC_JSON"

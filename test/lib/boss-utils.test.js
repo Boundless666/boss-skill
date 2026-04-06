@@ -123,4 +123,73 @@ describe('boss-utils', () => {
       assert.ok(fs.existsSync(filePath));
     });
   });
+
+  describe('loadArtifactDag', () => {
+    it('loads and parses DAG file', () => {
+      const dagPath = path.join(__dirname, '..', '..', 'harness', 'artifact-dag.json');
+      const dag = bossUtils.loadArtifactDag(dagPath);
+      assert.ok(dag);
+      assert.ok(dag.artifacts);
+      assert.ok(dag.artifacts['prd.md']);
+    });
+
+    it('returns null for missing file', () => {
+      const dag = bossUtils.loadArtifactDag('/nonexistent/dag.json');
+      assert.equal(dag, null);
+    });
+  });
+
+  describe('getReadyArtifacts', () => {
+    it('returns prd.md when no artifacts completed (design-brief optional)', () => {
+      const dagPath = path.join(__dirname, '..', '..', 'harness', 'artifact-dag.json');
+      const dag = bossUtils.loadArtifactDag(dagPath);
+      const execData = {
+        stages: {
+          '1': { artifacts: [] },
+          '2': { artifacts: [] },
+          '3': { artifacts: [] },
+          '4': { artifacts: [] }
+        }
+      };
+      const ready = bossUtils.getReadyArtifacts(dag, execData, {});
+      const names = ready.map(r => r.artifact);
+      assert.ok(names.includes('prd.md'));
+      assert.ok(!names.includes('architecture.md'));
+    });
+
+    it('returns architecture.md and ui-spec.md after prd.md completed', () => {
+      const dagPath = path.join(__dirname, '..', '..', 'harness', 'artifact-dag.json');
+      const dag = bossUtils.loadArtifactDag(dagPath);
+      const execData = {
+        stages: {
+          '1': { artifacts: ['prd.md'] },
+          '2': { artifacts: [] },
+          '3': { artifacts: [] },
+          '4': { artifacts: [] }
+        }
+      };
+      const ready = bossUtils.getReadyArtifacts(dag, execData, {});
+      const names = ready.map(r => r.artifact);
+      assert.ok(names.includes('architecture.md'));
+      assert.ok(names.includes('ui-spec.md'));
+      assert.ok(!names.includes('prd.md'));
+    });
+
+    it('skips ui-spec.md when skipUI is true', () => {
+      const dagPath = path.join(__dirname, '..', '..', 'harness', 'artifact-dag.json');
+      const dag = bossUtils.loadArtifactDag(dagPath);
+      const execData = {
+        stages: {
+          '1': { artifacts: ['prd.md'] },
+          '2': { artifacts: [] },
+          '3': { artifacts: [] },
+          '4': { artifacts: [] }
+        }
+      };
+      const ready = bossUtils.getReadyArtifacts(dag, execData, { skipUI: true });
+      const names = ready.map(r => r.artifact);
+      assert.ok(!names.includes('ui-spec.md'));
+      assert.ok(names.includes('architecture.md'));
+    });
+  });
 });

@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { findActiveFeature } = require('../lib/boss-utils');
+const { emitProgress } = require('../lib/progress-emitter');
 
 function isGateCommand(command) {
   return /gate-runner\.sh|gate0-|gate1-|gate2-/.test(command);
@@ -27,6 +28,14 @@ function run(rawInput) {
 
   if (isGateCommand(command)) {
     context = '[Harness] 门禁命令已执行，结果已写入 execution.json';
+    const active = findActiveFeature(cwd);
+    if (active) {
+      const gateMatch = command.match(/gate(\d)/);
+      emitProgress(cwd, active.feature, {
+        type: 'gate-result',
+        data: { gate: gateMatch ? 'gate' + gateMatch[1] : 'unknown', command }
+      });
+    }
   }
 
   if (isHarnessCommand(command)) {

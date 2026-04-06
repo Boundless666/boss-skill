@@ -90,6 +90,33 @@
       "type": "boolean",
       "description": "是否启用",
       "default": true
+    },
+    "when": {
+      "type": "object",
+      "description": "自动检测条件（用于 pipeline-pack 类型的自动选择）",
+      "properties": {
+        "fileExists": {
+          "type": "array",
+          "description": "项目中必须存在的文件/目录",
+          "items": { "type": "string" }
+        },
+        "noFileExists": {
+          "type": "array",
+          "description": "项目中必须不存在的文件/目录",
+          "items": { "type": "string" }
+        },
+        "packageJsonHas": {
+          "type": "array",
+          "description": "package.json 中必须包含的依赖包",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "priority": {
+      "type": "integer",
+      "description": "自动检测优先级（数字越大优先级越高）",
+      "default": 0
     }
   }
 }

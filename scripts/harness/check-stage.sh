@@ -18,6 +18,7 @@ Boss Harness - 阶段状态检查
 选项:
   --can-proceed         检查指定阶段是否可以开始执行
   --can-retry           检查指定阶段是否可以重试
+  --agents              显示指定阶段中各 Agent 的状态
   --json                以 JSON 格式输出
   --summary             输出流水线总体摘要
 
@@ -26,6 +27,7 @@ Boss Harness - 阶段状态检查
   check-stage.sh my-feature 2 --can-proceed    # 检查阶段 2 是否可以开始
   check-stage.sh my-feature 3 --can-retry      # 检查阶段 3 是否可以重试
   check-stage.sh my-feature --summary          # 输出流水线摘要
+  check-stage.sh my-feature 1 --agents          # 查看阶段 1 各 Agent 状态
   check-stage.sh my-feature --json             # JSON 格式输出所有状态
 EOF
 }
@@ -34,6 +36,7 @@ FEATURE=""
 STAGE=""
 CAN_PROCEED=false
 CAN_RETRY=false
+SHOW_AGENTS=false
 JSON_OUTPUT=false
 SUMMARY=false
 
@@ -42,6 +45,7 @@ while [[ $# -gt 0 ]]; do
         -h|--help) show_help; exit 0 ;;
         --can-proceed) CAN_PROCEED=true; shift ;;
         --can-retry) CAN_RETRY=true; shift ;;
+        --agents) SHOW_AGENTS=true; shift ;;
         --json) JSON_OUTPUT=true; shift ;;
         --summary) SUMMARY=true; shift ;;
         -*)  error "未知选项: $1" ;;
@@ -70,6 +74,30 @@ fi
 
 if [[ "$JSON_OUTPUT" == true && -n "$STAGE" ]]; then
     jq --arg s "$STAGE" '.stages[$s]' "$EXEC_JSON"
+    exit 0
+fi
+
+if [[ "$SHOW_AGENTS" == true ]]; then
+    [[ -z "$STAGE" ]] && error "--agents 需要指定 stage"
+
+    AGENTS_DATA=$(jq -r --arg s "$STAGE" '.stages[$s].agents // empty' "$EXEC_JSON")
+    if [[ -z "$AGENTS_DATA" || "$AGENTS_DATA" == "null" ]]; then
+        warn "阶段 $STAGE 没有 Agent 状态记录"
+        exit 0
+    fi
+
+    if [[ "$JSON_OUTPUT" == true ]]; then
+        jq --arg s "$STAGE" '.stages[$s].agents' "$EXEC_JSON"
+    else
+        echo ""
+        echo "阶段 $STAGE Agent 状态："
+        echo "───────────────────────────────"
+        jq -r --arg s "$STAGE" '
+            .stages[$s].agents | to_entries[] |
+            "\(.key): \(.value.status) (重试 \(.value.retryCount // 0)/\(.value.maxRetries // 2))"
+        ' "$EXEC_JSON"
+        echo ""
+    fi
     exit 0
 fi
 

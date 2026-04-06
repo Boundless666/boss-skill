@@ -85,6 +85,32 @@
 
 ---
 
+### REVISION_NEEDED
+
+**含义**：当前任务已完成评审/验证，但发现上游产物存在需要修订的问题。触发 Critic-Actor 反馈循环。
+
+**报告要求**：
+- 需要修订的上游产物名称（如 `architecture.md`）
+- 修订原因清单（每条包含：问题描述、期望修改、影响范围）
+- 当前任务的部分成果（已完成的部分可保留）
+- 修订优先级：`critical`（阻塞继续）/ `recommended`（可继续但建议修）
+
+**适用角色**：
+- **Tech Lead** → 可对 `architecture.md` 发起修订请求
+- **QA** → 可对代码产物发起修订请求
+- 其他角色不允许发起 REVISION_NEEDED
+
+**编排器处理策略**：
+1. 记录修订请求到 `execution.json` 的 `revisionRequests[]`
+2. 检查 `feedbackLoops.currentRound`：若已达 `maxRounds`（默认 2），停止循环并报告用户
+3. 递增 `feedbackLoops.currentRound`
+4. 调用 `scripts/harness/record-feedback.sh` 记录反馈事件
+5. 重新派发上游 Agent 执行修订（携带修订原因作为上下文）
+6. 修订完成后，重新派发当前 Agent 验证
+7. 若验证通过（DONE/DONE_WITH_CONCERNS），结束循环
+
+---
+
 ## 状态流转图
 
 ```
@@ -96,16 +122,19 @@
     │
     ├── 缺少信息 ──────────── → NEEDS_CONTEXT
     │
-    └── 无法继续 ──────────── → BLOCKED
+    ├── 无法继续 ──────────── → BLOCKED
+    │
+    └── 需要上游修订 ──────── → REVISION_NEEDED
 ```
 
 编排器收到状态后的流转：
 
 ```
 DONE                → 记录 → 继续下一任务
-DONE_WITH_CONCERNS  → 评估风险 → 继续 / 暂停等待用户
+DONE_WITH_CONCERNS  → 评估风险 → 继续 / 暂停���待用户
 NEEDS_CONTEXT       → 尝试自动解决 → 成功则重新派发 / 失败则请求用户
 BLOCKED             → 暂停 → 报告用户 → 等待干预 → 重试
+REVISION_NEEDED     → 记录反馈 → 检查轮次 → 重派上游修订 → 重新验证（≤2轮）
 ```
 
 ---

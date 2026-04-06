@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { STAGE_MAP } = require('../lib/boss-utils');
+const { STAGE_MAP, loadArtifactDag, getReadyArtifacts } = require('../lib/boss-utils');
 
 function run(rawInput) {
   const input = JSON.parse(rawInput);
@@ -46,6 +46,17 @@ function run(rawInput) {
           const stageStatus = stage.status || 'unknown';
 
           if (stageStatus !== 'running' && stageStatus !== 'retrying') {
+            // Also check DAG: if artifact inputs are ready, allow with ask
+            const dagPath = path.join(cwd, 'harness', 'artifact-dag.json');
+            const dag = loadArtifactDag(dagPath);
+            if (dag && dag.artifacts && dag.artifacts[artifact]) {
+              const ready = getReadyArtifacts(dag, data, data.parameters || {});
+              const isReady = ready.some(r => r.artifact === artifact);
+              if (isReady) {
+                return ''; // DAG says inputs are satisfied, allow write
+              }
+            }
+
             return JSON.stringify({
               hookSpecificOutput: {
                 hookEventName: 'PreToolUse',

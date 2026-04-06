@@ -83,7 +83,16 @@ pending → skipped（被 --skip-* 或 --continue-from 跳过）
 
 ---
 
-## 四阶段工作流
+## DAG 驱动工作流
+
+流水线由 Artifact DAG（`harness/artifact-dag.json`）驱动。每个产物声明其输入依赖和对应 Agent，依赖就绪即可执行，无需等待整个阶段完成。
+
+### 默认 DAG
+
+```
+design-brief → prd.md → architecture.md ─┬→ tech-review.md → tasks.md → [code] → qa-report.md → deploy-report.md
+                       └→ ui-spec.md(opt) ┘
+```
 
 Copy this checklist and check off items as you complete them:
 
@@ -93,7 +102,7 @@ Copy this checklist and check off items as you complete them:
   - [ ] -1.1 调用 `scripts/init-project.sh <feature-name> --template`
   - [ ] -1.2 确认 `.boss/templates/` 已创建，并包含默认模板副本
   - [ ] -1.3 提示用户先修改模板，再重新运行 `/boss ...`
-  - [ ] -1.4 ⛔ 本次执行到此结束，不进入阶段 1-4
+  - [ ] -1.4 ⛔ 本次执行到此结束，不进入 DAG 执行循环
 
 - [ ] **Step 0: 需求澄清** ⚠️ REQUIRED (除非 `--quick`)
   - [ ] 0.1 **判断需求完整度**：用户给的信息是否包含"做什么 + 给谁用 + 核心场景"？
@@ -102,66 +111,45 @@ Copy this checklist and check off items as you complete them:
   - [ ] 0.2 **Brainstorming 需求澄清**：读取 `skills/brainstorming/SKILL.md` 的流程，以 Boss 的身份执行需求澄清（不需要启动子 Agent，你自己来问）。一次一个问题，优先给选项，只问业务问题不问技术问题。
   - [ ] 0.3 **输出设计简报**：澄清完毕后，写入 `.boss/<feature>/design-brief.md`，向用户确认
   - [ ] 0.4 若不是 `--continue-from` 且 `.boss/<feature>/` 不存在，调用 `scripts/init-project.sh <feature-name>` 创建占位产物骨架
+  - [ ] 0.4a 🎯 **Pipeline Pack 自动检测**：调用 `scripts/harness/detect-pack.sh <project-dir>` 自动检测最佳 pipeline pack。若检测到匹配的 pack（非 default），使用该 pack 的 config 覆盖默认配置（agents、gates、skipUI 等）。用户通过 `--roles` 显式指定时覆盖自动检测结果。
+  - [ ] 0.4b 📐 **加载 Artifact DAG**：读取 `harness/artifact-dag.json`（或 pipeline pack 自定义 DAG），确定产物依赖图
   - [ ] 0.5 🔌 扫描 `harness/plugins/` 目录，识别已注册插件，记录到 `execution.json` 的 `plugins` 字段
-  - [ ] 0.6 将 `design-brief.md`（如有）作为上下文传递给阶段 1 的 PM Agent
+  - [ ] 0.6 将 `design-brief.md`（如有）作为上下文传递给后续 Agent
 
-- [ ] **阶段 1: 规划（需求穿透 → 设计）**
-  - [ ] 1.0 ⏩ 检查点：若 `--continue-from 2+` 且 `prd.md` / `architecture.md` 已存在，调用 `scripts/harness/update-stage.sh <feature> 1 skipped` 并跳过本阶段
-  - [ ] 1.0a 🔄 调用 `scripts/harness/update-stage.sh <feature> 1 running` 标记阶段开始
-  - [ ] 1.1 Load `references/artifact-guide.md` 获取产物保存规范
-  - [ ] 1.2 对本阶段每个产物分别调用 `scripts/prepare-artifact.sh <feature-name> <artifact-name>`，只为当前需要的文档准备模板骨架
-  - [ ] 1.3 Load `agents/boss-pm.md` → 调用 PM Agent 进行需求穿透。若 `.boss/<feature>/design-brief.md` 存在，将其作为需求输入传给 PM（design-brief 是用户确认过的需求，PM 基于此深入穿透，不需要重新问用户）。显式传入目标产物路径与已准备骨架
-  - [ ] 1.4~1.5 **并行执行**（同时调用以下两个 Agent，无需等待其中一个完成，并显式传入各自产物目标路径与已准备骨架）：
-    - Load `agents/boss-architect.md` → Architect Agent 设计架构
-    - Load `agents/boss-ui-designer.md` → UI Agent（除非 `--skip-ui`）
-  - [ ] 1.6 💾 保存产物到 `.boss/<feature>/`：`prd.md`, `architecture.md`, `ui-spec.md`
-  - [ ] 1.7 📝 调用 `scripts/harness/update-stage.sh <feature> 1 completed --artifact prd.md --artifact architecture.md --artifact ui-spec.md`
-  - [ ] 1.8 确认规划结果 ⚠️ REQUIRED (除非 `--quick`)
-  - [ ] 1.9 ❌ 若阶段失败：调用 `scripts/harness/update-stage.sh <feature> 1 failed --reason "<失败原因>"`，然后尝试 `scripts/harness/retry-stage.sh <feature> 1`；若已达重试上限，暂停并报告
+- [ ] **DAG 执行循环** — 重复以下步骤直到所有产物完成或被跳过：
 
-- [ ] **阶段 2: 评审 + 任务拆解**
-  - [ ] 2.0 ⏩ 检查点：若 `--continue-from 3+` 且 `tech-review.md` / `tasks.md` 已存在，调用 `scripts/harness/update-stage.sh <feature> 2 skipped` 并跳过
-  - [ ] 2.0a 🔄 调用 `scripts/harness/update-stage.sh <feature> 2 running`
-  - [ ] 2.1 读取阶段 1 产物（摘要优先）
-  - [ ] 2.2 Load `references/artifact-guide.md` 获取产物保存规范
-  - [ ] 2.3 对 `tech-review.md`、`tasks.md` 分别调用 `scripts/prepare-artifact.sh <feature-name> <artifact-name>` 准备当前阶段文档骨架
-  - [ ] 2.4 Load `agents/boss-tech-lead.md` → 技术评审
-  - [ ] 2.5 Load `agents/boss-scrum-master.md` → 任务拆解 + 测试用例定义
-  - [ ] 2.6 💾 保存产物：`tech-review.md`, `tasks.md`
-  - [ ] 2.7 📝 调用 `scripts/harness/update-stage.sh <feature> 2 completed --artifact tech-review.md --artifact tasks.md`
-  - [ ] 2.8 ❌ 若失败：同 1.9 流程
-
-- [ ] **阶段 3: 开发 + 持续验证**
-  - [ ] 3.0 ⏩ 检查点：若 `--continue-from 4` 且 `qa-report.md` 已存在且门禁通过，调用 `scripts/harness/update-stage.sh <feature> 3 skipped` 并跳过
-  - [ ] 3.0a 🔄 调用 `scripts/harness/update-stage.sh <feature> 3 running`
-  - [ ] 3.1 读取阶段 2 产物
-  - [ ] 3.2 Load `references/testing-standards.md`，根据任务类型调用开发 Agent（全栈项目前后端**并行执行**），将测试标准作为上下文传入：
-    - 前端 → Load `agents/boss-frontend.md`
-    - 后端 → Load `agents/boss-backend.md`
-  - [ ] 3.3 Load `references/artifact-guide.md` 获取产物保存规范，并调用 `scripts/prepare-artifact.sh <feature-name> qa-report.md`
-  - [ ] 3.4 Load `agents/boss-qa.md` → 执行全套测试，并在已准备骨架上输出 QA 报告
-  - [ ] 3.5 🚦 **Gate Engine 质量门禁** — 依次执行：
+  - [ ] **D.1 查询就绪产物**：调用 `scripts/harness/check-artifact.sh <feature> --ready --json` 获取当前所有输入依赖已满足的产物列表
+  - [ ] **D.2 阶段状态管理**：对就绪产物所属的阶段，若阶段状态为 `pending`，调用 `scripts/harness/update-stage.sh <feature> <N> running` 标记阶段开始
+  - [ ] **D.3 准备产物骨架**：对每个就绪产物调用 `scripts/prepare-artifact.sh <feature-name> <artifact-name>`
+  - [ ] **D.4 并行派发 Agent**：
+    - Load `references/artifact-guide.md` 获取产物保存规范
+    - 对同一阶段的就绪产物，**并行**调用对应 Agent（如 architecture.md + ui-spec.md 可并行）
+    - 不同阶段的就绪产物也可并行（DAG 保证依赖已满足）
+    - 每个 Agent 调用前 Load 对应的 Agent Prompt 文件 + `agents/shared/agent-protocol.md` + `agents/shared/tech-detection.md`
+    - 若产物为 `code`，根据任务类型调用 `boss-frontend` / `boss-backend`（全栈项目并行），同时 Load `references/testing-standards.md`
+  - [ ] **D.5 保存产物**：Agent 完成后将产物保存到 `.boss/<feature>/`
+  - [ ] **D.6 标记产物完成**：调用 `scripts/harness/update-stage.sh <feature> <N> completed --artifact <name>` 记录产物（当阶段内所有产物都完成时标记阶段 completed）
+  - [ ] **D.7 ❌ 失败处理**：若 Agent 失败，先调用 `scripts/harness/check-stage.sh <feature> <N> --agents` 检查哪些 Agent 已完成，仅对失败的 Agent 调用 `scripts/harness/retry-agent.sh <feature> <N> <agent-name>` 重试；若 agent 重试上限已达，才用 `scripts/harness/retry-stage.sh <feature> <N>` 重试整个阶段；若阶段重试上限也达，暂停并报告
+  - [ ] **D.7a 🔄 反馈循环**：若 Agent 报告 `REVISION_NEEDED`（仅 Tech Lead / QA 可发起）：
+    1. 调用 `scripts/harness/record-feedback.sh <feature> --from <critic-agent> --to <target-agent> --artifact <name> --reason "<原因>"` 记录反馈请求
+    2. 若返回错误（轮次已达上限），暂停并报告用户
+    3. 重新派发目标 Agent 修订上游产物（将修订原因作为额外上下文传入）
+    4. 修订完成后，重新派发 Critic Agent 验证
+    5. 若验证通过（DONE/DONE_WITH_CONCERNS），结束循环继续 DAG
+  - [ ] **D.8 确认节点**（仅在阶段边界且非 `--quick` 时）：
+    - 阶段 1 完成后 → 确认规划结果 ⚠️ REQUIRED
+    - 阶段 3 门禁后 → 可选确认
+  - [ ] **D.9 🚦 门禁**（阶段 3 产物完成后）：
     - 调用 `scripts/gates/gate-runner.sh <feature> gate0`（代码质量检查）
     - 调用 `scripts/gates/gate-runner.sh <feature> gate1`（测试门禁）
     - 调用 `scripts/gates/gate-runner.sh <feature> gate2`（性能门禁，仅 Web 项目）
     - 扫描 `harness/plugins/` 中 type=gate 的插件，依次执行
-    - 门禁结果已由 gate-runner 自动写入 `execution.json`
-  - [ ] 3.6 💾 保存产物：`qa-report.md`
-  - [ ] 3.7 📝 调用 `scripts/harness/update-stage.sh <feature> 3 completed --artifact qa-report.md --gate gate0 --gate-passed --gate gate1 --gate-passed`（根据实际门禁结果设置 --gate-passed 或 --gate-failed）
-  - [ ] 3.8 ❌ 若门禁未通过：调用 `scripts/harness/update-stage.sh <feature> 3 failed --reason "门禁未通过: <具体原因>"`，尝试修复后重试
-  - [ ] 3.9 📊 调用 `scripts/report/generate-summary.sh <feature>` 生成阶段报告
+    - 门禁失败时修复后重新执行门禁
+  - [ ] **D.10 回到 D.1**：重新查询就绪产物，直到 DAG 中所有非跳过产物都已完成
 
-- [ ] **阶段 4: 部署 + 交付**（除非 `--skip-deploy`）
-  - [ ] 4.0 若 `--skip-deploy`，调用 `scripts/harness/update-stage.sh <feature> 4 skipped`
-  - [ ] 4.0a 🔄 调用 `scripts/harness/update-stage.sh <feature> 4 running`
-  - [ ] 4.1 读取阶段 3 产物
-  - [ ] 4.2 Load `references/artifact-guide.md` 获取产物保存规范，并调用 `scripts/prepare-artifact.sh <feature-name> deploy-report.md`
-  - [ ] 4.3 Load `agents/boss-devops.md` → 构建部署，并在已准备骨架上输出部署报告
-  - [ ] 4.4 💾 保存产物：`deploy-report.md`
-  - [ ] 4.5 📝 调用 `scripts/harness/update-stage.sh <feature> 4 completed --artifact deploy-report.md`
-  - [ ] 4.6 📊 调用 `scripts/report/generate-summary.sh <feature>` 生成最终流水线报告
-  - [ ] 4.7 输出最终结果（文档位置 + 测试摘要 + 门禁结果 + 访问 URL + 流水线耗时）
-  - [ ] 4.8 ❌ 若失败：同 1.9 流程
+- [ ] **收尾**
+  - [ ] F.1 📊 调用 `scripts/report/generate-summary.sh <feature>` 生成最终流水线报告
+  - [ ] F.2 输出最终结果（文档位置 + 测试摘要 + 门禁结果 + 访问 URL + 流水线耗时）
 
 ---
 
@@ -186,6 +174,15 @@ Copy this checklist and check off items as you complete them:
 | `scripts/harness/update-stage.sh` | 原子化更新阶段状态（状态机转换 + 产物记录 + gate 判定） |
 | `scripts/harness/check-stage.sh` | 检查阶段状态、前置条件、重试可行性 |
 | `scripts/harness/retry-stage.sh` | 阶段重试（检查上限 → retrying → running） |
+| `scripts/harness/update-agent.sh` | Agent 级状态更新（running/completed/failed） |
+| `scripts/harness/retry-agent.sh` | 单个 Agent 重试（不重跑整个阶段） |
+| `scripts/harness/append-event.sh` | 追加事件到 events.jsonl（事件溯源） |
+| `scripts/harness/materialize-state.sh` | 从事件日志重建 execution.json |
+| `scripts/harness/replay-events.sh` | 事件回放与时间旅行调试 |
+| `scripts/harness/detect-pack.sh` | Pipeline Pack 自动检测（匹配项目文件） |
+| `scripts/harness/watch-progress.sh` | 实时进度监控（tail -f progress.jsonl） |
+| `scripts/harness/check-artifact.sh` | Artifact DAG 就绪检查（`--can-start`/`--ready`） |
+| `scripts/harness/record-feedback.sh` | Agent 间反馈循环记录（REVISION_NEEDED） |
 | `scripts/gates/gate-runner.sh` | Gate Engine 统一入口，执行指定门禁并写入结果 |
 | `scripts/gates/gate0-code-quality.sh` | Gate 0：代码质量（编译 + Lint） |
 | `scripts/gates/gate1-testing.sh` | Gate 1：测试门禁（覆盖率 + 通过率 + E2E） |

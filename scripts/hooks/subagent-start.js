@@ -2,7 +2,9 @@
 
 const fs = require('fs');
 const path = require('path');
-const { findActiveFeature, readExecJson } = require('../lib/boss-utils');
+const { findActiveFeature, readExecJson, AGENT_STAGE_MAP } = require('../lib/boss-utils');
+const { emitProgress } = require('../lib/progress-emitter');
+const { execSync } = require('child_process');
 
 function run(rawInput) {
   const input = JSON.parse(rawInput);
@@ -28,11 +30,29 @@ function run(rawInput) {
     }
   }
 
+  // Emit AgentStarted event if this is a known boss agent
+  const agentType = input.agent_type || '';
+  if (currentStage && AGENT_STAGE_MAP[agentType]) {
+    emitProgress(cwd, active.feature, {
+      type: 'agent-start',
+      data: { agent: agentType, stage: parseInt(currentStage) }
+    });
+    try {
+      const scriptPath = path.join(__dirname, '..', 'harness', 'update-agent.sh');
+      execSync(`bash "${scriptPath}" "${active.feature}" "${currentStage}" "${agentType}" running`, {
+        cwd,
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+    } catch (err) {
+      process.stderr.write('[boss-skill] subagent-start/update-agent: ' + err.message + '\n');
+    }
+  }
+
   let context = `[Boss Harness] 当前流水线: ${active.feature}`;
   if (currentStage) {
     context += `, 活跃阶段: ${currentStage} (${stageName})`;
   }
-  const agentType = input.agent_type || '';
   context += `\n子 Agent 类型: ${agentType}`;
 
   return JSON.stringify({

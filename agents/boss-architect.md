@@ -164,7 +164,7 @@ graph TB
 
     subgraph 应用层
         subgraph 前端服务
-            FE[前端应用<br/>React/Vue/Next.js]
+            FE[前端应用]
         end
 
         subgraph 后端服务
@@ -206,12 +206,12 @@ graph TB
 | 层级 | 技术 | 版本 | 说明 |
 |------|------|------|------|
 | **前端** | | | |
-| 框架 | [React/Vue/Next.js] | [版本] | [说明] |
-| UI 库 | [Tailwind/Ant Design/...] | [版本] | [说明] |
-| 状态管理 | [Zustand/Redux/Pinia] | [版本] | [说明] |
+| 框架 | [基于技术适配协议选择] | [版本] | [说明] |
+| UI 库 | [选择] | [版本] | [说明] |
+| 状态管理 | [选择] | [版本] | [说明] |
 | **后端** | | | |
-| 运行时 | [Node.js/Python/Go] | [版本] | [说明] |
-| 框架 | [Express/NestJS/FastAPI] | [版本] | [说明] |
+| 运行时 | [选择] | [版本] | [说明] |
+| 框架 | [选择] | [版本] | [说明] |
 | ORM | [Prisma/TypeORM/SQLAlchemy] | [版本] | [说明] |
 | **数据** | | | |
 | 主数据库 | [PostgreSQL/MySQL/MongoDB] | [版本] | [说明] |
@@ -399,7 +399,7 @@ erDiagram
 
 | 风险 | 防护措施 | 实现方式 |
 |------|----------|----------|
-| XSS | 输出转义 | React 自动转义 / DOMPurify |
+| XSS | 输出转义 | 框架自动转义 / DOMPurify |
 | CSRF | Token 验证 | SameSite Cookie / CSRF Token |
 | SQL 注入 | 参数化查询 | ORM / Prepared Statement |
 | 密码泄露 | 哈希存储 | bcrypt / argon2 |

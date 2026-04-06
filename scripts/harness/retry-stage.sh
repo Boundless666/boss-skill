@@ -51,7 +51,9 @@ fi
 
 info "开始重试阶段 $STAGE（第 $((RETRY_COUNT + 1)) 次重试，上限 $MAX_RETRIES 次）"
 
-"$SCRIPT_DIR/update-stage.sh" "$FEATURE" "$STAGE" retrying
-"$SCRIPT_DIR/update-stage.sh" "$FEATURE" "$STAGE" running
+# 事件溯源：追加 retrying → started 事件，然后物化
+"$SCRIPT_DIR/append-event.sh" "$FEATURE" StageRetrying --stage "$STAGE"
+"$SCRIPT_DIR/append-event.sh" "$FEATURE" StageStarted --stage "$STAGE"
+"$SCRIPT_DIR/materialize-state.sh" "$FEATURE"
 
 success "阶段 $STAGE 已重置为 running，可以重新执行"

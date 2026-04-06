@@ -13,6 +13,18 @@ const STAGE_MAP = {
   'deploy-report.md': 4
 };
 
+const AGENT_STAGE_MAP = {
+  'boss-pm': 1,
+  'boss-architect': 1,
+  'boss-ui-designer': 1,
+  'boss-tech-lead': 2,
+  'boss-scrum-master': 2,
+  'boss-frontend': 3,
+  'boss-backend': 3,
+  'boss-qa': 3,
+  'boss-devops': 4
+};
+
 function readExecJson(cwd, feature) {
   const execPath = path.join(cwd, '.boss', feature, '.meta', 'execution.json');
   try {
@@ -81,9 +93,65 @@ function writeJson(filePath, data) {
   fs.renameSync(tmp, filePath);
 }
 
+function loadArtifactDag(dagPath) {
+  try {
+    const raw = fs.readFileSync(dagPath, 'utf8');
+    return JSON.parse(raw);
+  } catch (err) {
+    process.stderr.write('[boss-skill] loadArtifactDag: ' + err.message + '\n');
+    return null;
+  }
+}
+
+function getReadyArtifacts(dag, execData, params) {
+  if (!dag || !dag.artifacts || !execData) return [];
+
+  const completedArtifacts = new Set();
+  const stages = execData.stages || {};
+  for (let s = 1; s <= 4; s++) {
+    const stage = stages[String(s)] || {};
+    for (const a of (stage.artifacts || [])) {
+      completedArtifacts.add(a);
+    }
+  }
+
+  const skipUI = (params && params.skipUI) || false;
+  const skipDeploy = (params && params.skipDeploy) || false;
+
+  function isSatisfied(name) {
+    if (completedArtifacts.has(name)) return true;
+    const def = dag.artifacts[name];
+    if (!def) return false;
+    if (def.optional) return true;
+    if (name === 'ui-spec.md' && skipUI) return true;
+    if (name === 'deploy-report.md' && skipDeploy) return true;
+    if (name === 'design-brief') return true; // always optional
+    return false;
+  }
+
+  const ready = [];
+  for (const [name, def] of Object.entries(dag.artifacts)) {
+    if (completedArtifacts.has(name)) continue;
+    if (name === 'ui-spec.md' && skipUI) continue;
+    if (name === 'deploy-report.md' && skipDeploy) continue;
+    if (!def.agent) continue; // manual inputs
+
+    const inputs = def.inputs || [];
+    const allReady = inputs.every(input => isSatisfied(input));
+    if (allReady) {
+      ready.push({ artifact: name, agent: def.agent, stage: def.stage });
+    }
+  }
+
+  return ready;
+}
+
 module.exports = {
   STAGE_MAP,
+  AGENT_STAGE_MAP,
   readExecJson,
   findActiveFeature,
-  writeJson
+  writeJson,
+  loadArtifactDag,
+  getReadyArtifacts
 };

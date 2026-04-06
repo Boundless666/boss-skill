@@ -38,17 +38,7 @@ model: inherit
 
 ## 部署策略
 
-| 项目类型 | 部署命令 | 默认端口 |
-|---------|---------|---------|
-| Next.js | npm run dev | 3000 |
-| React/Vue (Vite) | npm run dev | 5173 |
-| Create React App | npm start | 3000 |
-| Node.js API | npm start | 3000 |
-| Python FastAPI | uvicorn main:app --reload | 8000 |
-| Python Flask | python app.py | 5000 |
-| Python Django | python manage.py runserver | 8000 |
-| 静态 HTML | npx serve | 3000 |
-| Docker | docker-compose up -d | 配置端口 |
+> 按 `agents/shared/agent-protocol.md` 的「技术适配协议」检测项目类型，确定对应的构建/启动命令和默认端口。
 
 ## 输出格式
 

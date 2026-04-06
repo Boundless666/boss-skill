@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { STAGE_MAP, writeJson } = require('../lib/boss-utils');
+const { emitProgress } = require('../lib/progress-emitter');
 
 function run(rawInput) {
   const input = JSON.parse(rawInput);
@@ -52,6 +53,31 @@ function run(rawInput) {
   data.stages[String(stage)].artifacts = uniqueArtifacts;
 
   writeJson(execJsonPath, data);
+
+  // 进度事件
+  emitProgress(cwd, feature, {
+    type: 'artifact-written',
+    data: { artifact, stage }
+  });
+
+  // 事件溯源：追加 ArtifactRecorded 事件
+  const eventsPath = path.join(cwd, '.boss', feature, '.meta', 'events.jsonl');
+  try {
+    let eventId = 1;
+    if (fs.existsSync(eventsPath)) {
+      const lines = fs.readFileSync(eventsPath, 'utf8').trim().split('\n').filter(Boolean);
+      eventId = lines.length + 1;
+    }
+    const event = JSON.stringify({
+      id: eventId,
+      type: 'ArtifactRecorded',
+      timestamp: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+      data: { artifact, stage }
+    });
+    fs.appendFileSync(eventsPath, event + '\n', 'utf8');
+  } catch (err) {
+    process.stderr.write('[boss-skill] post-tool-write/appendEvent: ' + err.message + '\n');
+  }
 
   return JSON.stringify({
     hookSpecificOutput: {

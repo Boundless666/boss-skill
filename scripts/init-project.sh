@@ -267,13 +267,14 @@ cat > "$TARGET_DIR/deploy-report.md" << EOF
 
 EOF
 
-# 执行追踪元数据（Harness Engineer v0.1+ schema）
+# 执行追踪元数据（Harness Engineer v0.2+ schema，事件溯源）
+NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 cat > "$TARGET_DIR/.meta/execution.json" << EOF
 {
-  "schemaVersion": "0.1.0",
+  "schemaVersion": "0.2.0",
   "feature": "$FEATURE_NAME",
-  "createdAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "updatedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "createdAt": "$NOW",
+  "updatedAt": "$NOW",
   "status": "initialized",
   "parameters": {
     "skipUI": false,
@@ -340,9 +341,15 @@ cat > "$TARGET_DIR/.meta/execution.json" << EOF
     "retryTotal": 0
   },
   "plugins": [],
-  "humanInterventions": []
+  "humanInterventions": [],
+  "revisionRequests": [],
+  "feedbackLoops": { "maxRounds": 2, "currentRound": 0 }
 }
 EOF
+
+# 创建事件日志（事件溯源）
+INIT_EVENT="{\"id\":1,\"type\":\"PipelineInitialized\",\"timestamp\":\"$NOW\",\"data\":{\"initialState\":$(cat "$TARGET_DIR/.meta/execution.json" | jq -c .)}}"
+echo "$INIT_EVENT" > "$TARGET_DIR/.meta/events.jsonl"
 
     # 完成
     success "Boss Mode 项目目录初始化完成！"
