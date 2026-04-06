@@ -48,7 +48,7 @@
     "DESIGN.md"
   ],
   "bin": {
-    "boss-skill": "./bin/boss-skill.js"
+    "boss-skill": "bin/boss-skill.js"
   },
   "scripts": {
     "test": "node --test test/**/*.test.js",
