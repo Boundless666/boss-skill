@@ -51,6 +51,7 @@
     "boss-skill": "./bin/boss-skill.js"
   },
   "scripts": {
+    "test": "node --test test/**/*.test.js",
     "prepublishOnly": "node bin/boss-skill.js --version"
   },
   "publishConfig": {

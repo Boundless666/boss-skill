@@ -43,11 +43,13 @@ function run(rawInput) {
           const pj = JSON.parse(fs.readFileSync(pjPath, 'utf8'));
           const enabled = pj.enabled !== undefined ? pj.enabled : true;
           if (enabled) pluginCount++;
-        } catch {
+        } catch (err) {
+          process.stderr.write('[boss-skill] session-start/readPluginJson: ' + err.message + '\n');
           continue;
         }
       }
-    } catch {
+    } catch (err) {
+      process.stderr.write('[boss-skill] session-start/readdirPlugins: ' + err.message + '\n');
     }
   }
 
@@ -61,7 +63,8 @@ function run(rawInput) {
     try {
       previousSession = JSON.parse(fs.readFileSync(sessionStatePath, 'utf8'));
       context += '\n[Boss Harness] Previous session state loaded';
-    } catch {
+    } catch (err) {
+      process.stderr.write('[boss-skill] session-start/readSessionState: ' + err.message + '\n');
     }
   }
 

@@ -1,16 +1,9 @@
 #!/bin/bash
 set -e
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
-info() { echo -e "${BLUE}[HARNESS]${NC} $1"; }
-success() { echo -e "${GREEN}[HARNESS]${NC} $1"; }
-warn() { echo -e "${YELLOW}[HARNESS]${NC} $1"; }
-error() { echo -e "${RED}[HARNESS]${NC} $1" >&2; exit 1; }
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/../lib/common.sh"
+LOG_TAG="HARNESS"
 
 show_help() {
     cat << 'EOF'
@@ -167,13 +160,8 @@ for s in 1 2 3 4; do
     S_START=$(jq -r ".stages[\"$s\"].startTime" "$EXEC_JSON")
     S_END=$(jq -r ".stages[\"$s\"].endTime" "$EXEC_JSON")
     if [[ "$S_START" != "null" && "$S_END" != "null" ]]; then
-        if date -j -f "%Y-%m-%dT%H:%M:%SZ" "$S_START" +%s >/dev/null 2>&1; then
-            START_EPOCH=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$S_START" +%s 2>/dev/null)
-            END_EPOCH=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$S_END" +%s 2>/dev/null)
-        else
-            START_EPOCH=$(date -d "$S_START" +%s 2>/dev/null || echo "0")
-            END_EPOCH=$(date -d "$S_END" +%s 2>/dev/null || echo "0")
-        fi
+        START_EPOCH=$(iso_to_epoch "$S_START")
+        END_EPOCH=$(iso_to_epoch "$S_END")
         if [[ "$START_EPOCH" != "0" && "$END_EPOCH" != "0" ]]; then
             DURATION=$((END_EPOCH - START_EPOCH))
             jq --arg s "$s" --argjson d "$DURATION" \

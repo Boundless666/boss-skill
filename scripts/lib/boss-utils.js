@@ -18,7 +18,8 @@ function readExecJson(cwd, feature) {
   try {
     const raw = fs.readFileSync(execPath, 'utf8');
     return JSON.parse(raw);
-  } catch {
+  } catch (err) {
+    process.stderr.write('[boss-skill] readExecJson: ' + err.message + '\n');
     return null;
   }
 }
@@ -32,7 +33,8 @@ function findActiveFeature(cwd) {
   let entries;
   try {
     entries = fs.readdirSync(bossDir, { withFileTypes: true });
-  } catch {
+  } catch (err) {
+    process.stderr.write('[boss-skill] findActiveFeature/readdirSync: ' + err.message + '\n');
     return null;
   }
 
@@ -52,7 +54,8 @@ function findActiveFeature(cwd) {
           status
         };
       }
-    } catch {
+    } catch (err) {
+      process.stderr.write('[boss-skill] findActiveFeature/readExecJson: ' + err.message + '\n');
       continue;
     }
   }

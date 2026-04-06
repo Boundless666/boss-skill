@@ -15,7 +15,8 @@ function run(rawInput) {
   let entries;
   try {
     entries = fs.readdirSync(bossDir, { withFileTypes: true });
-  } catch {
+  } catch (err) {
+    process.stderr.write('[boss-skill] session-end/readdirSync: ' + err.message + '\n');
     return '';
   }
 
@@ -34,7 +35,8 @@ function run(rawInput) {
     let data;
     try {
       data = JSON.parse(fs.readFileSync(execJsonPath, 'utf8'));
-    } catch {
+    } catch (err) {
+      process.stderr.write('[boss-skill] session-end/readExecJson: ' + err.message + '\n');
       continue;
     }
 
@@ -63,7 +65,8 @@ function run(rawInput) {
       const sessionStatePath = path.join(cwd, '.boss', '.session-state.json');
       try {
         writeJson(sessionStatePath, sessionState);
-      } catch {
+      } catch (err) {
+        process.stderr.write('[boss-skill] session-end/writeSessionState: ' + err.message + '\n');
       }
 
       try {
@@ -73,7 +76,8 @@ function run(rawInput) {
             timeout: 10000
           });
         }
-      } catch {
+      } catch (err) {
+        process.stderr.write('[boss-skill] session-end/generateReport: ' + err.message + '\n');
       }
     }
   }

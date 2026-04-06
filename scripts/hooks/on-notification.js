@@ -17,7 +17,8 @@ function run(rawInput) {
   let entries;
   try {
     entries = fs.readdirSync(bossDir, { withFileTypes: true });
-  } catch {
+  } catch (err) {
+    process.stderr.write('[boss-skill] on-notification/readdirSync: ' + err.message + '\n');
     return '';
   }
 
@@ -29,7 +30,8 @@ function run(rawInput) {
     let data;
     try {
       data = JSON.parse(fs.readFileSync(execJsonPath, 'utf8'));
-    } catch {
+    } catch (err) {
+      process.stderr.write('[boss-skill] on-notification/readExecJson: ' + err.message + '\n');
       continue;
     }
 
@@ -49,7 +51,8 @@ function run(rawInput) {
           fs.mkdirSync(logDir, { recursive: true });
         }
         fs.appendFileSync(logFile, logEntry + '\n', 'utf8');
-      } catch {
+      } catch (err) {
+        process.stderr.write('[boss-skill] on-notification/appendLog: ' + err.message + '\n');
       }
       break;
     }

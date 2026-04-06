@@ -4,12 +4,10 @@
 
 set -e
 
-# 颜色定义
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$SCRIPT_DIR/lib/common.sh"
+LOG_TAG="BOSS"
 
 # 显示帮助信息
 show_help() {
@@ -31,31 +29,11 @@ show_help() {
     echo "  $0 todo-app --force"
 }
 
-# 打印信息
-info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
-}
-
-success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
-
-warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
-}
-
-error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-    exit 1
-}
-
 # 解析参数
 FEATURE_NAME=""
 FORCE=false
 INIT_TEMPLATES=false
 SKIP_FEATURE_BOOTSTRAP=false
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DEFAULT_TEMPLATE_DIR="$REPO_ROOT/templates"
 PROJECT_TEMPLATE_DIR=".boss/templates"
 

@@ -33,7 +33,8 @@ function run(rawInput) {
   let data;
   try {
     data = JSON.parse(fs.readFileSync(execJsonPath, 'utf8'));
-  } catch {
+  } catch (err) {
+    process.stderr.write('[boss-skill] post-tool-write/readExecJson: ' + err.message + '\n');
     return '';
   }
 

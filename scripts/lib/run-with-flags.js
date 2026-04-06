@@ -29,7 +29,7 @@ function readStdin() {
   var chunks = [];
   var total = 0;
   try {
-    var fd = fs.openSync('/dev/stdin', 'r');
+    var fd = fs.openSync(0, 'r');
     var buf = Buffer.alloc(4096);
     var n;
     while (true) {
@@ -43,7 +43,9 @@ function readStdin() {
       chunks.push(buf.slice(0, n));
     }
     fs.closeSync(fd);
-  } catch (_e) {}
+  } catch (_e) {
+    process.stderr.write('[boss-skill] run-with-flags/readStdin: ' + _e.message + '\n');
+  }
   return Buffer.concat(chunks);
 }
 
@@ -91,7 +93,9 @@ try {
 
     passthrough(stdinBuf);
   }
-} catch (_requireErr) {}
+} catch (_requireErr) {
+  process.stderr.write('[boss-skill] run-with-flags/require: ' + _requireErr.message + '\n');
+}
 
 try {
   var child = childProcess.spawnSync(process.execPath, [scriptAbs], {
@@ -113,5 +117,6 @@ try {
 
   process.exit(child.status || 0);
 } catch (_spawnErr) {
+  process.stderr.write('[boss-skill] run-with-flags/spawn: ' + _spawnErr.message + '\n');
   passthrough(stdinBuf);
 }

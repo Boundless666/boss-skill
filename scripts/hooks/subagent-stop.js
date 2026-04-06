@@ -20,7 +20,8 @@ function run(rawInput) {
     if (!fs.existsSync(logDir)) {
       fs.mkdirSync(logDir, { recursive: true });
     }
-  } catch {
+  } catch (err) {
+    process.stderr.write('[boss-skill] subagent-stop/mkdirSync: ' + err.message + '\n');
     return '';
   }
 
@@ -37,7 +38,8 @@ function run(rawInput) {
 
   try {
     fs.appendFileSync(logFile, entry + '\n', 'utf8');
-  } catch {
+  } catch (err) {
+    process.stderr.write('[boss-skill] subagent-stop/appendLog: ' + err.message + '\n');
   }
 
   return '';

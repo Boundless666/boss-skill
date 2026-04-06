@@ -15,7 +15,8 @@ function run(rawInput) {
   let entries;
   try {
     entries = fs.readdirSync(bossDir, { withFileTypes: true });
-  } catch {
+  } catch (err) {
+    process.stderr.write('[boss-skill] session-resume/readdirSync: ' + err.message + '\n');
     return '';
   }
 
@@ -29,7 +30,8 @@ function run(rawInput) {
     let data;
     try {
       data = JSON.parse(fs.readFileSync(execJsonPath, 'utf8'));
-    } catch {
+    } catch (err) {
+      process.stderr.write('[boss-skill] session-resume/readExecJson: ' + err.message + '\n');
       continue;
     }
 
@@ -61,7 +63,8 @@ function run(rawInput) {
     try {
       previousSession = JSON.parse(fs.readFileSync(sessionStatePath, 'utf8'));
       context += '\n[Boss Harness] Previous session state loaded';
-    } catch {
+    } catch (err) {
+      process.stderr.write('[boss-skill] session-resume/readSessionState: ' + err.message + '\n');
     }
   }
 

@@ -3,17 +3,8 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
-info() { echo -e "${BLUE}[PLUGIN]${NC} $1"; }
-success() { echo -e "${GREEN}[PLUGIN]${NC} $1"; }
-warn() { echo -e "${YELLOW}[PLUGIN]${NC} $1"; }
-error() { echo -e "${RED}[PLUGIN]${NC} $1" >&2; exit 1; }
+source "$SCRIPT_DIR/../lib/common.sh"
+LOG_TAG="PLUGIN"
 
 show_help() {
     cat << 'EOF'

@@ -189,7 +189,29 @@ function hooksInstall() {
   const destFile = path.join(dest, "settings.json");
   if (fs.existsSync(destFile)) {
     const existing = JSON.parse(fs.readFileSync(destFile, "utf8"));
-    existing.hooks = { ...existing.hooks, ...settings.hooks };
+    if (!existing.hooks) existing.hooks = {};
+
+    for (const event of Object.keys(settings.hooks)) {
+      const bossHooks = settings.hooks[event];
+      if (!Array.isArray(bossHooks)) continue;
+      if (!Array.isArray(existing.hooks[event])) {
+        existing.hooks[event] = [];
+      }
+
+      for (const bossHook of bossHooks) {
+        const bossId = bossHook.id || '';
+        const idx = bossId
+          ? existing.hooks[event].findIndex((h) => h.id === bossId)
+          : -1;
+
+        if (idx >= 0) {
+          existing.hooks[event][idx] = bossHook;
+        } else {
+          existing.hooks[event].push(bossHook);
+        }
+      }
+    }
+
     fs.writeFileSync(destFile, JSON.stringify(existing, null, 2) + "\n");
   } else {
     fs.writeFileSync(destFile, JSON.stringify(settings, null, 2) + "\n");
