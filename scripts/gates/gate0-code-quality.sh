@@ -14,7 +14,7 @@ gate_info "========================"
 
 if command -v npx >/dev/null 2>&1 && [[ -f "tsconfig.json" ]]; then
     gate_info "检查 TypeScript 编译..."
-    if npx tsc --noEmit 2>/dev/null; then
+    if npx tsc --noEmit 2>&1 | tail -20 >&2; then
         gate_pass "TypeScript 编译无错误"
         add_check "typescript-compile" true
     else
@@ -31,7 +31,7 @@ LINT_FOUND=false
 if [[ -f "biome.json" || -f "biome.jsonc" ]]; then
     gate_info "检查 Biome Lint..."
     LINT_FOUND=true
-    if npx biome check . 2>/dev/null; then
+    if npx biome check . 2>&1 | tail -20 >&2; then
         gate_pass "Biome Lint 通过"
         add_check "lint" true
     else
@@ -42,7 +42,7 @@ if [[ -f "biome.json" || -f "biome.jsonc" ]]; then
 elif [[ -f ".eslintrc" || -f ".eslintrc.js" || -f ".eslintrc.json" || -f ".eslintrc.yml" || -f "eslint.config.js" || -f "eslint.config.mjs" ]]; then
     gate_info "检查 ESLint..."
     LINT_FOUND=true
-    if npx eslint . --max-warnings=0 2>/dev/null; then
+    if npx eslint . --max-warnings=0 2>&1 | tail -20 >&2; then
         gate_pass "ESLint 通过"
         add_check "lint" true
     else
@@ -56,7 +56,7 @@ if [[ "$LINT_FOUND" == false ]]; then
     if command -v ruff >/dev/null 2>&1 && [[ -f "pyproject.toml" || -f "ruff.toml" ]]; then
         gate_info "检查 Ruff Lint..."
         LINT_FOUND=true
-        if ruff check . 2>/dev/null; then
+        if ruff check . 2>&1 | tail -20 >&2; then
             gate_pass "Ruff Lint 通过"
             add_check "lint" true
         else

@@ -89,6 +89,8 @@ Compatible with Claude Code, OpenClaw, Codex & Antigravity.
 Usage:
   boss-skill                Auto-detect all agents and install
   boss-skill install        Same as above
+  boss-skill install --dry-run   Preview install actions without writing
+  boss-skill uninstall      Remove boss-skill from all detected agents
   boss-skill path           Print the installed skill root directory
   boss-skill --version      Print version
   boss-skill --help         Show this help
@@ -132,8 +134,13 @@ function copyDir(src, dest, exclude) {
   }
 }
 
-function copyInstall(agent) {
+function copyInstall(agent, dryRun) {
   const dest = agent.dest();
+
+  if (dryRun) {
+    console.log(`  [dry-run] ${agent.name}: would install to ${dest}`);
+    return;
+  }
 
   if (fs.existsSync(dest)) {
     fs.rmSync(dest, { recursive: true });
@@ -157,7 +164,7 @@ function copyInstall(agent) {
   console.log(`  ✅ ${agent.name}: ${dest} (copied + metadata injected)`);
 }
 
-function hooksInstall() {
+function hooksInstall(dryRun) {
   const dest = path.resolve(process.cwd(), ".claude");
   const src = path.join(PKG_ROOT, ".claude", "settings.json");
 
@@ -187,6 +194,12 @@ function hooksInstall() {
   });
 
   const destFile = path.join(dest, "settings.json");
+
+  if (dryRun) {
+    console.log(`  [dry-run] Claude Code: would merge ${hookEvents.length} hook events → ${destFile}`);
+    return;
+  }
+
   if (fs.existsSync(destFile)) {
     const existing = JSON.parse(fs.readFileSync(destFile, "utf8"));
     if (!existing.hooks) existing.hooks = {};
@@ -220,29 +233,89 @@ function hooksInstall() {
   console.log(`  ✅ Claude Code: ${hookEvents.length} hook events → .claude/settings.json`);
 }
 
-function autoInstall() {
-  console.log(`@blade-ai/boss-skill v${pkg.version}\n`);
+function autoInstall(dryRun) {
+  console.log(`@blade-ai/boss-skill v${pkg.version}${dryRun ? ' (dry-run)' : ''}\n`);
 
   const detected = AGENTS.filter((a) => a.detect());
   console.log(`Detected ${detected.length} agent(s):\n`);
 
   for (const agent of detected) {
     if (agent.method === "copy") {
-      copyInstall(agent);
+      copyInstall(agent, dryRun);
     } else {
-      hooksInstall();
+      hooksInstall(dryRun);
     }
   }
 
-  console.log("\nDone! Restart your agent or start a new session to pick up boss-skill.");
+  if (dryRun) {
+    console.log("\nDry-run complete. No files were modified.");
+  } else {
+    console.log("\nDone! Restart your agent or start a new session to pick up boss-skill.");
+  }
+}
+
+function uninstall() {
+  console.log(`@blade-ai/boss-skill v${pkg.version} — uninstall\n`);
+
+  const copyAgents = AGENTS.filter((a) => a.method === "copy" && a.detect());
+
+  for (const agent of copyAgents) {
+    const dest = agent.dest();
+    if (fs.existsSync(dest)) {
+      fs.rmSync(dest, { recursive: true });
+      console.log(`  ✅ ${agent.name}: removed ${dest}`);
+    } else {
+      console.log(`  ⏭️  ${agent.name}: not installed, skipped`);
+    }
+  }
+
+  const destFile = path.resolve(process.cwd(), ".claude", "settings.json");
+  if (fs.existsSync(destFile)) {
+    try {
+      const existing = JSON.parse(fs.readFileSync(destFile, "utf8"));
+      if (existing.hooks) {
+        let removedCount = 0;
+        for (const event of Object.keys(existing.hooks)) {
+          if (!Array.isArray(existing.hooks[event])) continue;
+          const before = existing.hooks[event].length;
+          existing.hooks[event] = existing.hooks[event].filter(
+            (h) => !h.id || !h.id.startsWith("boss-")
+          );
+          removedCount += before - existing.hooks[event].length;
+          if (existing.hooks[event].length === 0) {
+            delete existing.hooks[event];
+          }
+        }
+        if (Object.keys(existing.hooks).length === 0) {
+          delete existing.hooks;
+        }
+        fs.writeFileSync(destFile, JSON.stringify(existing, null, 2) + "\n");
+        console.log(`  ✅ Claude Code: removed ${removedCount} boss-skill hooks from ${destFile}`);
+      } else {
+        console.log(`  ⏭️  Claude Code: no hooks found in settings.json`);
+      }
+    } catch (err) {
+      console.error(`  ❌ Claude Code: failed to clean settings.json: ${err.message}`);
+    }
+  } else {
+    console.log(`  ⏭️  Claude Code: .claude/settings.json not found`);
+  }
+
+  console.log("\nUninstall complete.");
 }
 
 const cmd = process.argv[2];
+const args = process.argv.slice(3);
+const dryRun = args.includes("--dry-run");
 
 switch (cmd) {
   case "install":
   case undefined:
-    autoInstall();
+    autoInstall(dryRun);
+    break;
+
+  case "uninstall":
+    uninstall();
     break;
 
   case "path":

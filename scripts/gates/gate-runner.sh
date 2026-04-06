@@ -124,9 +124,13 @@ fi
 TMP_FILE=$(mktemp)
 trap 'rm -f "$RESULT_FILE" "$TMP_FILE"' EXIT
 
-jq --arg gate "$GATE_NAME" --argjson passed "$GATE_PASSED" --arg now "$NOW" --argjson checks "$GATE_CHECKS" \
+if ! jq --arg gate "$GATE_NAME" --argjson passed "$GATE_PASSED" --arg now "$NOW" --argjson checks "$GATE_CHECKS" \
     '.qualityGates[$gate] = { "status": "completed", "passed": $passed, "checks": $checks, "executedAt": $now }' \
-    "$EXEC_JSON" > "$TMP_FILE" && mv "$TMP_FILE" "$EXEC_JSON"
+    "$EXEC_JSON" > "$TMP_FILE"; then
+    warn "门禁结果写入失败: jq 处理 $EXEC_JSON 出错"
+    [[ "$GATE_PASSED" == true ]] && exit 0 || exit 1
+fi
+mv "$TMP_FILE" "$EXEC_JSON"
 
 TOTAL_GATES=0
 PASSED_GATES=0
@@ -143,7 +147,8 @@ done
 
 if [[ "$TOTAL_GATES" -gt 0 ]]; then
     PASS_RATE=$(echo "scale=2; $PASSED_GATES * 100 / $TOTAL_GATES" | bc)
-    jq --argjson rate "$PASS_RATE" '.metrics.gatePassRate = $rate' "$EXEC_JSON" > "$TMP_FILE" && mv "$TMP_FILE" "$EXEC_JSON"
+    jq --argjson rate "$PASS_RATE" '.metrics.gatePassRate = $rate' "$EXEC_JSON" > "$TMP_FILE" && mv "$TMP_FILE" "$EXEC_JSON" \
+        || warn "门禁通过率写入失败"
 fi
 
 info "结果已写入: $EXEC_JSON"

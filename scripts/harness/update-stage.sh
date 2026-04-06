@@ -96,7 +96,7 @@ trap 'rm -f "$TMP_FILE"' EXIT
 cp "$EXEC_JSON" "$TMP_FILE"
 
 jq --arg stage "$STAGE" --arg status "$STATUS" --arg now "$NOW" \
-    '.stages[$stage].status = $status | .updatedAt = $now' "$TMP_FILE" > "$EXEC_JSON"
+    '.stages[$stage].status = $status | .updatedAt = $now' "$TMP_FILE" > "${TMP_FILE}.out" && mv "${TMP_FILE}.out" "$EXEC_JSON"
 
 if [[ "$STATUS" == "running" ]]; then
     CURRENT_START=$(jq -r ".stages[\"$STAGE\"].startTime" "$EXEC_JSON")

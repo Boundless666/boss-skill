@@ -76,10 +76,12 @@ while [[ $# -gt 0 ]]; do
         --register) ACTION="register"; FEATURE="$2"; shift 2 ;;
         --run-hook)
             ACTION="run-hook"
+            [[ -z "${2:-}" ]] && error "--run-hook 需要指定 hook 名称"
+            [[ -z "${3:-}" ]] && error "--run-hook 需要指定 feature 参数"
             HOOK_NAME="$2"
             FEATURE="$3"
             STAGE="${4:-}"
-            shift; shift; shift
+            shift 3
             [[ -n "$STAGE" ]] && shift
             ;;
         -*)  error "未知选项: $1" ;;

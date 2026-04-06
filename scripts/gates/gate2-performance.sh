@@ -38,7 +38,7 @@ if [[ "$IS_WEB" == true ]]; then
         LH_OUTPUT=$(mktemp)
         trap 'rm -f "$LH_OUTPUT"' EXIT
 
-        if npx lighthouse "$BUILD_URL" --output=json --quiet --chrome-flags="--headless --no-sandbox" > "$LH_OUTPUT" 2>/dev/null; then
+        if npx lighthouse "$BUILD_URL" --output=json --quiet --chrome-flags="--headless --no-sandbox" > "$LH_OUTPUT" 2>&1; then
             PERF_SCORE=$(jq -r '.categories.performance.score // 0' "$LH_OUTPUT" 2>/dev/null)
             PERF_SCORE_100=$(echo "$PERF_SCORE * 100" | bc 2>/dev/null | cut -d'.' -f1)
 

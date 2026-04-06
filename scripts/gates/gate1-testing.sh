@@ -53,7 +53,7 @@ if [[ -z "$TEST_CMD" ]]; then
 fi
 
 gate_info "执行单元测试: $TEST_CMD"
-if eval "$TEST_CMD" 2>/dev/null; then
+if $TEST_CMD 2>&1 | tail -30 >&2; then
     gate_pass "单元测试全部通过"
     add_check "unit-tests" true
 else
@@ -64,7 +64,7 @@ fi
 
 if [[ -n "$COVERAGE_CMD" ]]; then
     gate_info "检查测试覆盖率..."
-    COVERAGE_OUTPUT=$(eval "$COVERAGE_CMD" 2>/dev/null || true)
+    COVERAGE_OUTPUT=$($COVERAGE_CMD 2>&1 | tail -30 || true)
 
     COVERAGE_PCT=""
     if [[ -f "coverage/coverage-summary.json" ]]; then
@@ -98,7 +98,7 @@ E2E_FOUND=false
 if [[ -f "playwright.config.ts" || -f "playwright.config.js" ]]; then
     gate_info "执行 Playwright E2E 测试..."
     E2E_FOUND=true
-    if npx playwright test 2>/dev/null; then
+    if npx playwright test 2>&1 | tail -20 >&2; then
         gate_pass "Playwright E2E 测试通过"
         add_check "e2e-tests" true "Playwright"
     else
@@ -109,7 +109,7 @@ if [[ -f "playwright.config.ts" || -f "playwright.config.js" ]]; then
 elif [[ -f "cypress.config.ts" || -f "cypress.config.js" ]]; then
     gate_info "执行 Cypress E2E 测试..."
     E2E_FOUND=true
-    if npx cypress run 2>/dev/null; then
+    if npx cypress run 2>&1 | tail -20 >&2; then
         gate_pass "Cypress E2E 测试通过"
         add_check "e2e-tests" true "Cypress"
     else

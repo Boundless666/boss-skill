@@ -38,6 +38,7 @@ function findActiveFeature(cwd) {
     return null;
   }
 
+  const actives = [];
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     const execJsonPath = path.join(bossDir, entry.name, '.meta', 'execution.json');
@@ -48,11 +49,11 @@ function findActiveFeature(cwd) {
       const data = JSON.parse(raw);
       const status = data.status || 'unknown';
       if (status === 'running' || status === 'initialized') {
-        return {
+        actives.push({
           feature: data.feature || entry.name,
           execJsonPath,
           status
-        };
+        });
       }
     } catch (err) {
       process.stderr.write('[boss-skill] findActiveFeature/readExecJson: ' + err.message + '\n');
@@ -60,7 +61,14 @@ function findActiveFeature(cwd) {
     }
   }
 
-  return null;
+  if (actives.length === 0) return null;
+
+  if (actives.length > 1) {
+    const names = actives.map(a => a.feature).join(', ');
+    process.stderr.write('[boss-skill] findActiveFeature: 检测到多个活跃流水线 (' + names + ')，使用第一个: ' + actives[0].feature + '\n');
+  }
+
+  return actives[0];
 }
 
 function writeJson(filePath, data) {

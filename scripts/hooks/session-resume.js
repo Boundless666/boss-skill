@@ -54,15 +54,15 @@ function run(rawInput) {
 
   if (!pendingFeatures) return '';
 
-  let context = `[Boss Harness] Session resumed. Unfinished pipelines:\n${pendingFeatures}`;
-  context += '\nUse /boss <feature> --continue-from <stage> to resume.';
+  let context = `[Boss Harness] 会话恢复。未完成的流水线:\n${pendingFeatures}`;
+  context += '\n使用 /boss <feature> --continue-from <stage> 继续。';
 
   const sessionStatePath = path.join(cwd, '.boss', '.session-state.json');
   let previousSession = null;
   if (fs.existsSync(sessionStatePath)) {
     try {
       previousSession = JSON.parse(fs.readFileSync(sessionStatePath, 'utf8'));
-      context += '\n[Boss Harness] Previous session state loaded';
+      context += '\n[Boss Harness] 已加载上次会话状态';
     } catch (err) {
       process.stderr.write('[boss-skill] session-resume/readSessionState: ' + err.message + '\n');
     }
