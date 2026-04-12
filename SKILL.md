@@ -183,7 +183,7 @@ Copy this checklist and check off items as you complete them:
 | `scripts/harness/watch-progress.sh` | 实时进度监控（tail -f progress.jsonl） |
 | `scripts/harness/check-artifact.sh` | Artifact DAG 就绪检查（`--can-start`/`--ready`） |
 | `scripts/harness/record-feedback.sh` | Agent 间反馈循环记录（REVISION_NEEDED） |
-| `scripts/gates/gate-runner.sh` | Gate Engine 统一入口，执行指定门禁并写入结果 |
+| `scripts/gates/gate-runner.sh` | Gate Engine 统一入口，执行指定门禁并追加事件后物化结果 |
 | `scripts/gates/gate0-code-quality.sh` | Gate 0：代码质量（编译 + Lint） |
 | `scripts/gates/gate1-testing.sh` | Gate 1：测试门禁（覆盖率 + 通过率 + E2E） |
 | `scripts/gates/gate2-performance.sh` | Gate 2：性能门禁（Lighthouse + API P99） |
@@ -216,7 +216,7 @@ hooks 定义在两处：
 | `session:start` | SessionStart (startup) | all | 检测活跃流水线 + 加载上次 session 状态，注入上下文 |
 | `session:resume` | SessionStart (resume) | all | 恢复会话时提示未完成的流水线 |
 | `pre:write:artifact-guard` | PreToolUse (Write\|Edit) | standard,strict | 阻止直接编辑 execution.json；写入产物时校验阶段状态 |
-| `post:write:artifact-track` | PostToolUse (Write) | standard,strict | 文件写入 `.boss/` 后自动记录产物到 execution.json |
+| `post:write:artifact-track` | PostToolUse (Write) | standard,strict | 文件写入 `.boss/` 后自动追加产物事件并物化 execution.json |
 | `post:bash:context` | PostToolUse (Bash) | standard,strict | 捕获门禁/测试/harness 命令执行，注入上下文 |
 | `subagent:start` | SubagentStart | all | 子 Agent 启动时注入当前流水线阶段上下文 |
 | `subagent:stop` | SubagentStop | all | 子 Agent 结束后记录执行日志到 agent-log.jsonl |

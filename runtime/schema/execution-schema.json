@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://boss-skill.local/schema/execution-schema.json",
+  "title": "Boss Execution State",
+  "type": "object",
+  "required": ["schemaVersion", "feature", "status", "stages", "qualityGates", "metrics", "plugins"],
+  "properties": {
+    "schemaVersion": { "type": "string" },
+    "feature": { "type": "string" },
+    "createdAt": { "type": "string" },
+    "updatedAt": { "type": "string" },
+    "status": {
+      "type": "string",
+      "enum": ["initialized", "running", "completed", "failed"]
+    },
+    "parameters": { "type": "object" },
+    "stages": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "running", "completed", "failed", "retrying", "skipped"]
+          },
+          "startTime": { "type": ["string", "null"] },
+          "endTime": { "type": ["string", "null"] },
+          "retryCount": { "type": "integer", "minimum": 0 },
+          "maxRetries": { "type": "integer", "minimum": 0 },
+          "failureReason": { "type": ["string", "null"] },
+          "artifacts": { "type": "array", "items": { "type": "string" } },
+          "gateResults": { "type": "object" },
+          "agents": { "type": "object" }
+        },
+        "required": ["status", "artifacts", "gateResults"]
+      }
+    },
+    "qualityGates": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "passed": { "type": ["boolean", "null"] },
+          "checks": { "type": "array" },
+          "executedAt": { "type": ["string", "null"] }
+        },
+        "required": ["status", "checks"]
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "required": ["totalDuration", "stageTimings", "gatePassRate", "retryTotal"],
+      "properties": {
+        "totalDuration": { "type": ["number", "null"] },
+        "stageTimings": { "type": "object" },
+        "gatePassRate": { "type": ["number", "null"] },
+        "retryTotal": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "plugins": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "version", "type"],
+        "properties": {
+          "name": { "type": "string" },
+          "version": { "type": "string" },
+          "type": { "type": "string" }
+        }
+      }
+    },
+    "humanInterventions": { "type": "array" },
+    "revisionRequests": { "type": "array" },
+    "feedbackLoops": { "type": "object" }
+  },
+  "additionalProperties": true
+}

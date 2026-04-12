@@ -83,4 +83,48 @@ describe('post-tool-write hook', () => {
     }));
     assert.equal(result, '');
   });
+
+  it('records an artifact event even when execution.json drifted ahead of events', () => {
+    const execData = createExecData({
+      feature: 'test-feat',
+      stages: {
+        '1': { name: 'Planning', status: 'running', artifacts: ['prd.md'] },
+        '2': { name: 'Review', status: 'pending', artifacts: [] },
+        '3': { name: 'Development', status: 'pending', artifacts: [] },
+        '4': { name: 'Deployment', status: 'pending', artifacts: [] }
+      }
+    });
+    tmpDir = createTempBossDir('test-feat', execData);
+
+    const metaDir = path.join(tmpDir, '.boss', 'test-feat', '.meta');
+    fs.writeFileSync(path.join(metaDir, 'events.jsonl'), JSON.stringify({
+      id: 1,
+      type: 'PipelineInitialized',
+      timestamp: '2024-01-01T00:00:00Z',
+      data: {
+        initialState: createExecData({
+          feature: 'test-feat',
+          stages: {
+            '1': { name: 'Planning', status: 'running', artifacts: [] },
+            '2': { name: 'Review', status: 'pending', artifacts: [] },
+            '3': { name: 'Development', status: 'pending', artifacts: [] },
+            '4': { name: 'Deployment', status: 'pending', artifacts: [] }
+          }
+        })
+      }
+    }) + '\n', 'utf8');
+
+    const result = hook.run(JSON.stringify({
+      tool_input: { file_path: path.join(tmpDir, '.boss', 'test-feat', 'prd.md') },
+      cwd: tmpDir
+    }));
+
+    assert.ok(result.length > 0);
+
+    const eventsPath = path.join(metaDir, 'events.jsonl');
+    const events = fs.readFileSync(eventsPath, 'utf8').trim().split('\n').map(line => JSON.parse(line));
+    assert.equal(events.length, 2);
+    assert.equal(events[1].type, 'ArtifactRecorded');
+    assert.equal(events[1].data.artifact, 'prd.md');
+  });
 });

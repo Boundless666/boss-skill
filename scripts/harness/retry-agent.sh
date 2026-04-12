@@ -56,13 +56,8 @@ fi
 
 info "重试 Agent $AGENT_NAME（第 $((RETRY_COUNT + 1)) 次，上限 $MAX_RETRIES）"
 
-# 更新 agent 状态为 running
+# 记录重试事件，再将 agent 切回 running
+"$SCRIPT_DIR/append-event.sh" "$FEATURE" AgentRetryScheduled --stage "$STAGE" --agent "$AGENT_NAME"
 "$SCRIPT_DIR/update-agent.sh" "$FEATURE" "$STAGE" "$AGENT_NAME" running
-
-# 更新 retryCount（直接修改 execution.json）
-TMP_FILE=$(mktemp)
-trap 'rm -f "$TMP_FILE"' EXIT
-jq --arg s "$STAGE" --arg a "$AGENT_NAME" \
-    '.stages[$s].agents[$a].retryCount += 1' "$EXEC_JSON" > "$TMP_FILE" && mv "$TMP_FILE" "$EXEC_JSON"
 
 success "Agent $AGENT_NAME 已重置为 running"

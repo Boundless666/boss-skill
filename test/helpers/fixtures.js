@@ -15,6 +15,17 @@ function createTempBossDir(feature, execData) {
       JSON.stringify(execData, null, 2) + '\n',
       'utf8'
     );
+    const timestamp = execData.createdAt || '2024-01-01T00:00:00Z';
+    fs.writeFileSync(
+      path.join(metaDir, 'events.jsonl'),
+      JSON.stringify({
+        id: 1,
+        type: 'PipelineInitialized',
+        timestamp,
+        data: { initialState: execData }
+      }) + '\n',
+      'utf8'
+    );
   }
 
   return tmpDir;

@@ -27,7 +27,7 @@ function run(rawInput) {
   let context = '';
 
   if (isGateCommand(command)) {
-    context = '[Harness] 门禁命令已执行，结果已写入 execution.json';
+    context = '[Harness] 门禁命令已执行，结果已追加事件并物化到 execution.json';
     const active = findActiveFeature(cwd);
     if (active) {
       const gateMatch = command.match(/gate(\d)/);

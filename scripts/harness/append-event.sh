@@ -18,6 +18,8 @@ Boss Harness - 事件追加
   StageFailed          StageRetrying   StageSkipped
   ArtifactRecorded     GateEvaluated
   AgentStarted         AgentCompleted  AgentFailed
+  AgentRetryScheduled  RevisionRequested
+  PluginsRegistered
 
 选项:
   --stage <n>          阶段编号
@@ -68,7 +70,7 @@ done
 [[ -z "$FEATURE" ]] && error "缺少 feature 参数"
 [[ -z "$EVENT_TYPE" ]] && error "缺少 event-type 参数"
 
-VALID_TYPES="PipelineInitialized StageStarted StageCompleted StageFailed StageRetrying StageSkipped ArtifactRecorded GateEvaluated AgentStarted AgentCompleted AgentFailed"
+VALID_TYPES="PipelineInitialized StageStarted StageCompleted StageFailed StageRetrying StageSkipped ArtifactRecorded GateEvaluated AgentStarted AgentCompleted AgentFailed AgentRetryScheduled RevisionRequested PluginsRegistered"
 echo "$VALID_TYPES" | grep -qw "$EVENT_TYPE" || error "无效事件类型: $EVENT_TYPE"
 
 EVENTS_FILE=".boss/$FEATURE/.meta/events.jsonl"

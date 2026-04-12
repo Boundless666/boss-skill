@@ -37,6 +37,7 @@ FEATURE=""
 GATE_NAME=""
 DRY_RUN=false
 SKIP_ON_ERROR=false
+GATE_STAGE="3"
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -83,6 +84,13 @@ fi
 
 info "执行门禁: $GATE_NAME ($GATE_SCRIPT)"
 
+if [[ "$GATE_NAME" != "gate0" && "$GATE_NAME" != "gate1" && "$GATE_NAME" != "gate2" ]]; then
+    PLUGIN_JSON="harness/plugins/$GATE_NAME/plugin.json"
+    if [[ -f "$PLUGIN_JSON" ]]; then
+        GATE_STAGE=$(jq -r '.stages[0] // 3' "$PLUGIN_JSON")
+    fi
+fi
+
 NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 RESULT_FILE=$(mktemp)
 trap 'rm -f "$RESULT_FILE"' EXIT
@@ -121,35 +129,13 @@ if [[ "$DRY_RUN" == true ]]; then
     [[ "$GATE_PASSED" == true ]] && exit 0 || exit 1
 fi
 
-TMP_FILE=$(mktemp)
-trap 'rm -f "$RESULT_FILE" "$TMP_FILE"' EXIT
-
-if ! jq --arg gate "$GATE_NAME" --argjson passed "$GATE_PASSED" --arg now "$NOW" --argjson checks "$GATE_CHECKS" \
-    '.qualityGates[$gate] = { "status": "completed", "passed": $passed, "checks": $checks, "executedAt": $now }' \
-    "$EXEC_JSON" > "$TMP_FILE"; then
-    warn "门禁结果写入失败: jq 处理 $EXEC_JSON 出错"
-    [[ "$GATE_PASSED" == true ]] && exit 0 || exit 1
-fi
-mv "$TMP_FILE" "$EXEC_JSON"
-
-TOTAL_GATES=0
-PASSED_GATES=0
-for g in $(jq -r '.qualityGates | keys[]' "$EXEC_JSON"); do
-    G_STATUS=$(jq -r ".qualityGates.$g.status" "$EXEC_JSON")
-    G_PASSED=$(jq -r ".qualityGates.$g.passed" "$EXEC_JSON")
-    if [[ "$G_STATUS" == "completed" ]]; then
-        TOTAL_GATES=$((TOTAL_GATES + 1))
-        if [[ "$G_PASSED" == "true" ]]; then
-            PASSED_GATES=$((PASSED_GATES + 1))
-        fi
-    fi
-done
-
-if [[ "$TOTAL_GATES" -gt 0 ]]; then
-    PASS_RATE=$(echo "scale=2; $PASSED_GATES * 100 / $TOTAL_GATES" | bc)
-    jq --argjson rate "$PASS_RATE" '.metrics.gatePassRate = $rate' "$EXEC_JSON" > "$TMP_FILE" && mv "$TMP_FILE" "$EXEC_JSON" \
-        || warn "门禁通过率写入失败"
-fi
+EVENT_DATA=$(jq -cn --argjson checks "$GATE_CHECKS" '{checks: $checks}')
+"$HARNESS_DIR/append-event.sh" "$FEATURE" GateEvaluated \
+    --gate "$GATE_NAME" \
+    --passed "$GATE_PASSED" \
+    --stage "$GATE_STAGE" \
+    --data "$EVENT_DATA" >/dev/null
+"$HARNESS_DIR/materialize-state.sh" "$FEATURE" >/dev/null
 
 info "结果已写入: $EXEC_JSON"
 [[ "$GATE_PASSED" == true ]] && exit 0 || exit 1

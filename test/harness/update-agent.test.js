@@ -130,6 +130,13 @@ describe('agent-level-retry', () => {
 
     const exec = readExecJson();
     assert.equal(exec.stages['1'].agents['boss-pm'].status, 'running');
+    assert.equal(exec.stages['1'].agents['boss-pm'].retryCount, 1);
+
+    const eventsFile = path.join(tmpDir, '.boss', 'test-feat', '.meta', 'events.jsonl');
+    const lines = fs.readFileSync(eventsFile, 'utf8').trim().split('\n');
+    const retryEvent = JSON.parse(lines[lines.length - 2]);
+    assert.equal(retryEvent.type, 'AgentRetryScheduled');
+    assert.equal(retryEvent.data.agent, 'boss-pm');
   });
 
   it('retry-agent.sh rejects non-failed agent', () => {

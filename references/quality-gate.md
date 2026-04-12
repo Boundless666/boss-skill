@@ -1,7 +1,7 @@
 # 质量门禁
 
 Boss Harness Gate Engine 提供三层程序化门禁，由 `scripts/gates/gate-runner.sh` 统一调度。
-所有门禁结果自动写入 `.meta/execution.json` 的 `qualityGates` 字段。
+所有门禁结果都会先追加到 `.meta/events.jsonl`，再物化到 `.meta/execution.json` 的 `qualityGates` 字段。
 
 ## Gate 0：代码质量（开发完成后，测试执行前）
 
@@ -70,7 +70,7 @@ scripts/gates/gate-runner.sh <feature> gate0 --dry-run
 ## 未通过处理
 
 如果门禁未通过：
-1. gate-runner 自动将失败结果写入 `execution.json`
+1. gate-runner 自动追加门禁结果事件并物化 `execution.json`
 2. Boss Agent 调用 `update-stage.sh` 标记阶段为 `failed`
 3. 尝试修复后通过 `retry-stage.sh` 重试
 4. 重新执行对应门禁

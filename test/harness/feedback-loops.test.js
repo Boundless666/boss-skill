@@ -8,6 +8,7 @@ const os = require('os');
 const { execSync } = require('child_process');
 
 const RECORD_FEEDBACK_SCRIPT = path.join(__dirname, '..', '..', 'scripts', 'harness', 'record-feedback.sh');
+const MATERIALIZE_SCRIPT = path.join(__dirname, '..', '..', 'scripts', 'harness', 'materialize-state.sh');
 
 describe('feedback-loops', () => {
   let tmpDir;
@@ -124,11 +125,29 @@ describe('feedback-loops', () => {
 
     const eventsFile = path.join(tmpDir, '.boss', 'test-feat', '.meta', 'events.jsonl');
     const lines = fs.readFileSync(eventsFile, 'utf8').trim().split('\n');
-    assert.ok(lines.length >= 2); // initial + feedback event
+    assert.ok(lines.length >= 2);
 
     const lastEvent = JSON.parse(lines[lines.length - 1]);
-    assert.equal(lastEvent.type, 'AgentFailed');
-    assert.ok(lastEvent.data.reason.includes('REVISION_NEEDED'));
+    assert.equal(lastEvent.type, 'RevisionRequested');
+    assert.equal(lastEvent.data.from, 'boss-tech-lead');
+    assert.equal(lastEvent.data.to, 'boss-architect');
+  });
+
+  it('rebuilds revision requests from events', () => {
+    runScript('test-feat --from boss-tech-lead --to boss-architect --artifact architecture.md --reason "test" --priority critical');
+    runScript(`test-feat --from boss-qa --to boss-backend --artifact code --reason "round 2"`);
+
+    execSync(`bash "${MATERIALIZE_SCRIPT}" test-feat`, {
+      encoding: 'utf8',
+      cwd: tmpDir,
+      env: { ...process.env, PATH: process.env.PATH }
+    });
+
+    const exec = readExecJson();
+    assert.equal(exec.feedbackLoops.currentRound, 2);
+    assert.equal(exec.revisionRequests.length, 2);
+    assert.equal(exec.revisionRequests[0].priority, 'critical');
+    assert.equal(exec.revisionRequests[1].to, 'boss-backend');
   });
 
   it('requires all mandatory parameters', () => {

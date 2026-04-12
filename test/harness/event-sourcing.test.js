@@ -136,4 +136,35 @@ describe('event-sourcing', () => {
     assert.equal(execJson.qualityGates.gate0.status, 'completed');
     assert.equal(execJson.qualityGates.gate0.passed, true);
   });
+
+  it('materialize preserves gate checks and computes gate pass rate', () => {
+    runScript(APPEND_SCRIPT, `test-feat GateEvaluated --gate gate0 --passed true --stage 3 --data '${JSON.stringify({
+      checks: [{ name: 'lint', passed: true, detail: 'ok' }]
+    })}'`);
+    runScript(APPEND_SCRIPT, `test-feat GateEvaluated --gate gate1 --passed false --stage 3 --data '${JSON.stringify({
+      checks: [{ name: 'unit-tests', passed: false, detail: 'failed' }]
+    })}'`);
+
+    runScript(MATERIALIZE_SCRIPT, 'test-feat');
+
+    const execJson = JSON.parse(fs.readFileSync(
+      path.join(tmpDir, '.boss', 'test-feat', '.meta', 'execution.json'), 'utf8'
+    ));
+    assert.deepEqual(execJson.qualityGates.gate0.checks, [{ name: 'lint', passed: true, detail: 'ok' }]);
+    assert.deepEqual(execJson.qualityGates.gate1.checks, [{ name: 'unit-tests', passed: false, detail: 'failed' }]);
+    assert.equal(execJson.metrics.gatePassRate, 50);
+  });
+
+  it('materialize handles PluginsRegistered events', () => {
+    runScript(APPEND_SCRIPT, `test-feat PluginsRegistered --data '${JSON.stringify({
+      plugins: [{ name: 'security-audit', version: '1.0.0', type: 'gate' }]
+    })}'`);
+
+    runScript(MATERIALIZE_SCRIPT, 'test-feat');
+
+    const execJson = JSON.parse(fs.readFileSync(
+      path.join(tmpDir, '.boss', 'test-feat', '.meta', 'execution.json'), 'utf8'
+    ));
+    assert.deepEqual(execJson.plugins, [{ name: 'security-audit', version: '1.0.0', type: 'gate' }]);
+  });
 });

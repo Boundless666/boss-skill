@@ -101,9 +101,9 @@
 - 其他角色不允许发起 REVISION_NEEDED
 
 **编排器处理策略**：
-1. 记录修订请求到 `execution.json` 的 `revisionRequests[]`
+1. 调用 `scripts/harness/record-feedback.sh` 追加 `RevisionRequested` 事件并物化状态
 2. 检查 `feedbackLoops.currentRound`：若已达 `maxRounds`（默认 2），停止循环并报告用户
-3. 递增 `feedbackLoops.currentRound`
+3. 继续按物化后的 `feedbackLoops.currentRound` 决定是否重派
 4. 调用 `scripts/harness/record-feedback.sh` 记录反馈事件
 5. 重新派发上游 Agent 执行修订（携带修订原因作为上下文）
 6. 修订完成后，重新派发当前 Agent 验证

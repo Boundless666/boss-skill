@@ -110,7 +110,7 @@ npm update -g @blade-ai/boss-skill && boss-skill
 
 每个阶段遵循状态转换：`pending → running → completed/failed → retrying → running`
 
-状态变更通过 `scripts/harness/update-stage.sh` 原子写入 `.meta/execution.json`。
+状态变更通过事件追加到 `.meta/events.jsonl`，再由 `scripts/harness/materialize-state.sh` 物化为只读的 `.meta/execution.json`。
 
 ### 质量门禁
 

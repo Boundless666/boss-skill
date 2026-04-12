@@ -11,7 +11,7 @@ Boss Harness - 反馈循环记录
 
 用法: record-feedback.sh <feature> --from <agent> --to <agent> --artifact <name> --reason <text>
 
-记录 Agent 间的反馈请求（REVISION_NEEDED），并更新 execution.json 中的反馈循环状态。
+记录 Agent 间的反馈请求（REVISION_NEEDED），追加事件并物化反馈循环状态。
 
 参数:
   feature   功能名称
@@ -73,36 +73,18 @@ fi
 
 NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-# Record revision request and increment round
-TMP_FILE=$(mktemp)
-trap 'rm -f "$TMP_FILE"' EXIT
-
-jq --arg from "$FROM_AGENT" \
-   --arg to "$TO_AGENT" \
-   --arg artifact "$ARTIFACT" \
-   --arg reason "$REASON" \
-   --arg priority "$PRIORITY" \
-   --arg ts "$NOW" \
-   '
-   .revisionRequests += [{
-     from: $from,
-     to: $to,
-     artifact: $artifact,
-     reason: $reason,
-     priority: $priority,
-     timestamp: $ts,
-     resolved: false
-   }] |
-   .feedbackLoops.currentRound += 1
-   ' "$EXEC_JSON" > "$TMP_FILE" && mv "$TMP_FILE" "$EXEC_JSON"
-
 NEW_ROUND=$((CURRENT_ROUND + 1))
 
-# Append event
-"$SCRIPT_DIR/append-event.sh" "$FEATURE" AgentFailed \
-    --agent "$FROM_AGENT" \
-    --reason "REVISION_NEEDED: $REASON" \
-    --data "{\"revisionTarget\":\"$TO_AGENT\",\"artifact\":\"$ARTIFACT\",\"priority\":\"$PRIORITY\"}"
+# Append event and re-materialize state
+EVENT_DATA=$(jq -cn \
+    --arg from "$FROM_AGENT" \
+    --arg to "$TO_AGENT" \
+    --arg artifact "$ARTIFACT" \
+    --arg reason "$REASON" \
+    --arg priority "$PRIORITY" \
+    '{from: $from, to: $to, artifact: $artifact, reason: $reason, priority: $priority}')
+"$SCRIPT_DIR/append-event.sh" "$FEATURE" RevisionRequested --data "$EVENT_DATA"
+"$SCRIPT_DIR/materialize-state.sh" "$FEATURE" >/dev/null
 
 info "反馈循环 #$NEW_ROUND/$MAX_ROUNDS: $FROM_AGENT → $TO_AGENT ($ARTIFACT)"
 info "原因: $REASON"

@@ -170,9 +170,9 @@ case "$ACTION" in
                 '. += [{"name": $n, "version": $v, "type": $t}]')
         done
 
-        TMP_FILE=$(mktemp)
-        trap 'rm -f "$TMP_FILE"' EXIT
-        jq --argjson plugins "$PLUGINS" '.plugins = $plugins' "$EXEC_JSON" > "$TMP_FILE" && mv "$TMP_FILE" "$EXEC_JSON"
+        EVENT_DATA=$(jq -cn --argjson plugins "$PLUGINS" '{plugins: $plugins}')
+        "$SCRIPT_DIR/append-event.sh" "$FEATURE" PluginsRegistered --data "$EVENT_DATA" >/dev/null
+        "$SCRIPT_DIR/materialize-state.sh" "$FEATURE" >/dev/null
 
         COUNT=$(echo "$PLUGINS" | jq 'length')
         success "已注册 $COUNT 个插件到 $EXEC_JSON"

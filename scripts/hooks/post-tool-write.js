@@ -2,8 +2,34 @@
 
 const fs = require('fs');
 const path = require('path');
-const { STAGE_MAP, writeJson } = require('../lib/boss-utils');
+const { execFileSync } = require('child_process');
+const { STAGE_MAP } = require('../lib/boss-utils');
 const { emitProgress } = require('../lib/progress-emitter');
+
+function hasArtifactInEventLog(eventsPath, artifact, stage) {
+  if (!fs.existsSync(eventsPath)) return false;
+
+  try {
+    const lines = fs.readFileSync(eventsPath, 'utf8').split('\n').filter(Boolean);
+    return lines.some(line => {
+      const event = JSON.parse(line);
+      if (event.type === 'ArtifactRecorded' && event.data) {
+        return event.data.artifact === artifact && String(event.data.stage) === String(stage);
+      }
+
+      if (event.type === 'PipelineInitialized' && event.data && event.data.initialState) {
+        const stages = event.data.initialState.stages || {};
+        const artifacts = ((stages[String(stage)] || {}).artifacts) || [];
+        return artifacts.includes(artifact);
+      }
+
+      return false;
+    });
+  } catch (err) {
+    process.stderr.write('[boss-skill] post-tool-write/readEvents: ' + err.message + '\n');
+    return false;
+  }
+}
 
 function run(rawInput) {
   const input = JSON.parse(rawInput);
@@ -25,34 +51,14 @@ function run(rawInput) {
 
   const feature = match[1];
   const execJsonPath = path.join(cwd, '.boss', feature, '.meta', 'execution.json');
+  const eventsPath = path.join(cwd, '.boss', feature, '.meta', 'events.jsonl');
 
   if (!fs.existsSync(execJsonPath)) return '';
 
   const stage = STAGE_MAP[artifact];
   if (stage === undefined) return '';
 
-  let data;
-  try {
-    data = JSON.parse(fs.readFileSync(execJsonPath, 'utf8'));
-  } catch (err) {
-    process.stderr.write('[boss-skill] post-tool-write/readExecJson: ' + err.message + '\n');
-    return '';
-  }
-
-  const stages = data.stages || {};
-  const stageData = stages[String(stage)] || {};
-  const artifacts = stageData.artifacts || [];
-
-  if (artifacts.includes(artifact)) return '';
-
-  artifacts.push(artifact);
-  const uniqueArtifacts = [...new Set(artifacts)];
-
-  if (!data.stages) data.stages = {};
-  if (!data.stages[String(stage)]) data.stages[String(stage)] = {};
-  data.stages[String(stage)].artifacts = uniqueArtifacts;
-
-  writeJson(execJsonPath, data);
+  if (hasArtifactInEventLog(eventsPath, artifact, stage)) return '';
 
   // 进度事件
   emitProgress(cwd, feature, {
@@ -60,29 +66,27 @@ function run(rawInput) {
     data: { artifact, stage }
   });
 
-  // 事件溯源：追加 ArtifactRecorded 事件
-  const eventsPath = path.join(cwd, '.boss', feature, '.meta', 'events.jsonl');
   try {
-    let eventId = 1;
-    if (fs.existsSync(eventsPath)) {
-      const lines = fs.readFileSync(eventsPath, 'utf8').trim().split('\n').filter(Boolean);
-      eventId = lines.length + 1;
-    }
-    const event = JSON.stringify({
-      id: eventId,
-      type: 'ArtifactRecorded',
-      timestamp: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
-      data: { artifact, stage }
+    const appendScript = path.join(__dirname, '..', 'harness', 'append-event.sh');
+    const materializeScript = path.join(__dirname, '..', 'harness', 'materialize-state.sh');
+
+    execFileSync('bash', [appendScript, feature, 'ArtifactRecorded', '--artifact', artifact, '--stage', String(stage)], {
+      cwd,
+      stdio: 'pipe'
     });
-    fs.appendFileSync(eventsPath, event + '\n', 'utf8');
+    execFileSync('bash', [materializeScript, feature], {
+      cwd,
+      stdio: 'pipe'
+    });
   } catch (err) {
-    process.stderr.write('[boss-skill] post-tool-write/appendEvent: ' + err.message + '\n');
+    process.stderr.write('[boss-skill] post-tool-write/materialize: ' + err.message + '\n');
+    return '';
   }
 
   return JSON.stringify({
     hookSpecificOutput: {
       hookEventName: 'PostToolUse',
-      additionalContext: `[Harness] 产物 ${artifact} 已自动记录到阶段 ${stage}`
+      additionalContext: `[Harness] 产物 ${artifact} 已通过事件记录到阶段 ${stage}`
     }
   });
 }

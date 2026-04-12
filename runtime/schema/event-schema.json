@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://boss-skill.local/schema/event-schema.json",
+  "title": "Boss Event",
+  "type": "object",
+  "required": ["id", "type", "timestamp", "data"],
+  "properties": {
+    "id": { "type": "integer", "minimum": 1 },
+    "type": {
+      "type": "string",
+      "enum": [
+        "PipelineInitialized",
+        "StageStarted",
+        "StageCompleted",
+        "StageFailed",
+        "StageRetrying",
+        "StageSkipped",
+        "ArtifactRecorded",
+        "GateEvaluated",
+        "AgentStarted",
+        "AgentCompleted",
+        "AgentFailed",
+        "AgentRetryScheduled",
+        "RevisionRequested",
+        "PluginsRegistered"
+      ]
+    },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "data": { "type": "object" }
+  },
+  "additionalProperties": false
+}
