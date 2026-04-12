@@ -35,6 +35,7 @@ describe('post-tool-bash hook', () => {
     assert.ok(result.length > 0);
     const parsed = JSON.parse(result);
     assert.ok(parsed.hookSpecificOutput.additionalContext.includes('门禁'));
+    assert.ok(parsed.hookSpecificOutput.additionalContext.includes('read model'));
   });
 
   it('detects harness commands', () => {

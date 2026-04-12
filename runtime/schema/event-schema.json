@@ -10,6 +10,7 @@
       "type": "string",
       "enum": [
         "PipelineInitialized",
+        "PackApplied",
         "StageStarted",
         "StageCompleted",
         "StageFailed",
@@ -22,11 +23,130 @@
         "AgentFailed",
         "AgentRetryScheduled",
         "RevisionRequested",
+        "PluginDiscovered",
+        "PluginActivated",
         "PluginsRegistered"
       ]
     },
     "timestamp": { "type": "string", "format": "date-time" },
     "data": { "type": "object" }
   },
+  "allOf": [
+    {
+      "if": { "properties": { "type": { "const": "PipelineInitialized" } } },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["initialState"],
+            "properties": {
+              "initialState": { "type": "object" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "ArtifactRecorded" } } },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["artifact", "stage"],
+            "properties": {
+              "artifact": { "type": "string", "minLength": 1 },
+              "stage": { "type": "integer", "minimum": 1 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "GateEvaluated" } } },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["gate", "passed", "stage"],
+            "properties": {
+              "gate": { "type": "string", "minLength": 1 },
+              "passed": { "type": "boolean" },
+              "stage": { "type": "integer", "minimum": 1 },
+              "checks": { "type": "array" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "PluginDiscovered" } } },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["plugin"],
+            "properties": {
+              "plugin": {
+                "type": "object",
+                "required": ["name", "version", "type"],
+                "properties": {
+                  "name": { "type": "string", "minLength": 1 },
+                  "version": { "type": "string", "minLength": 1 },
+                  "type": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "PluginActivated" } } },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["plugin"],
+            "properties": {
+              "plugin": {
+                "type": "object",
+                "required": ["name", "version", "type"],
+                "properties": {
+                  "name": { "type": "string", "minLength": 1 },
+                  "version": { "type": "string", "minLength": 1 },
+                  "type": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "PluginsRegistered" } } },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["plugins"],
+            "properties": {
+              "plugins": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["name", "version", "type"],
+                  "properties": {
+                    "name": { "type": "string", "minLength": 1 },
+                    "version": { "type": "string", "minLength": 1 },
+                    "type": { "type": "string", "minLength": 1 }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
   "additionalProperties": false
 }

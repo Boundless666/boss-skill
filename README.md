@@ -112,6 +112,10 @@ npm update -g @blade-ai/boss-skill && boss-skill
 
 状态变更通过事件追加到 `.meta/events.jsonl`，再由 `scripts/harness/materialize-state.sh` 物化为只读的 `.meta/execution.json`。
 
+### Runtime / CLI 编排面（Canonical）
+
+`runtime/cli/*.js` 与 `runtime/cli/lib/pipeline-runtime.js` 是当前编排的 canonical surface。现有 shell 命令（如 `scripts/harness/update-stage.sh`、`scripts/harness/update-agent.sh`、`scripts/gates/gate-runner.sh`）保持稳定，作为 runtime/cli 的兼容包装层，不改变调用习惯。该兼容关系是部分能力对齐（兼容导向），不是逐项行为等价；`test/runtime/feature-flow.integration.test.js` 直接验证 canonical runtime CLI 编排链路。
+
 ### 质量门禁
 
 三层门禁，不可绕过：

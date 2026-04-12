@@ -92,6 +92,10 @@ function defaultExecutionState(feature = '') {
       retryTotal: 0
     },
     plugins: [],
+    pluginLifecycle: {
+      discovered: [],
+      activated: []
+    },
     humanInterventions: [],
     revisionRequests: [],
     feedbackLoops: { maxRounds: 2, currentRound: 0 }
@@ -142,13 +146,209 @@ function normalizePlugins(plugins) {
   for (const plugin of plugins) {
     if (!plugin || typeof plugin !== 'object') continue;
     const key = `${plugin.name || ''}:${plugin.version || ''}:${plugin.type || ''}`;
-    deduped.set(key, {
+    const normalized = {
       name: plugin.name || '',
       version: plugin.version || '',
       type: plugin.type || ''
-    });
+    };
+    const dependencies = Array.isArray(plugin.dependencies)
+      ? plugin.dependencies.filter((dep) => typeof dep === 'string')
+      : [];
+    if (dependencies.length > 0) {
+      normalized.dependencies = dependencies;
+    }
+    if (typeof plugin.manifestPath === 'string' && plugin.manifestPath.length > 0) {
+      normalized.manifestPath = plugin.manifestPath;
+    }
+    deduped.set(key, normalized);
   }
   return [...deduped.values()];
+}
+
+function failValidation(message, context = '') {
+  throw new Error(context ? `${context}: ${message}` : message);
+}
+
+function isNonEmptyString(value) {
+  return typeof value === 'string' && value.length > 0;
+}
+
+function isBoolean(value) {
+  return value === true || value === false;
+}
+
+function isPositiveInteger(value) {
+  return Number.isInteger(value) && value >= 1;
+}
+
+function validatePluginSummary(plugin, context) {
+  if (!isObject(plugin)) {
+    failValidation('plugin 必须是对象', context);
+  }
+  if (!isNonEmptyString(plugin.name)) {
+    failValidation('plugin.name 必须是非空字符串', context);
+  }
+  if (!isNonEmptyString(plugin.version)) {
+    failValidation('plugin.version 必须是非空字符串', context);
+  }
+  if (!isNonEmptyString(plugin.type)) {
+    failValidation('plugin.type 必须是非空字符串', context);
+  }
+}
+
+function validateEvent(event) {
+  if (!isObject(event)) {
+    failValidation('event 必须是对象');
+  }
+  if (!isPositiveInteger(event.id)) {
+    failValidation('event.id 必须是正整数');
+  }
+  if (!EVENT_TYPE_VALUES.includes(event.type)) {
+    failValidation(`未知事件类型 ${JSON.stringify(event.type)}`);
+  }
+  if (!isNonEmptyString(event.timestamp) || !Number.isFinite(Date.parse(event.timestamp))) {
+    failValidation(`事件 ${event.type} 的 timestamp 无效`);
+  }
+  if (!isObject(event.data)) {
+    failValidation(`事件 ${event.type} 的 data 必须是对象`);
+  }
+
+  const context = `事件 ${event.type}`;
+  switch (event.type) {
+    case EVENT_TYPES.PIPELINE_INITIALIZED:
+      if (!isObject(event.data.initialState)) {
+        failValidation('initialState 必须是对象', context);
+      }
+      break;
+    case EVENT_TYPES.PACK_APPLIED:
+      if (!isNonEmptyString(event.data.pack)) {
+        failValidation('pack 必须是非空字符串', context);
+      }
+      break;
+    case EVENT_TYPES.STAGE_STARTED:
+    case EVENT_TYPES.STAGE_COMPLETED:
+    case EVENT_TYPES.STAGE_RETRYING:
+    case EVENT_TYPES.STAGE_SKIPPED:
+      if (!isPositiveInteger(event.data.stage)) {
+        failValidation('stage 必须是正整数', context);
+      }
+      break;
+    case EVENT_TYPES.STAGE_FAILED:
+      if (!isPositiveInteger(event.data.stage)) {
+        failValidation('stage 必须是正整数', context);
+      }
+      if (event.data.reason !== undefined && event.data.reason !== null && typeof event.data.reason !== 'string') {
+        failValidation('reason 必须是字符串或 null', context);
+      }
+      break;
+    case EVENT_TYPES.ARTIFACT_RECORDED:
+      if (!isPositiveInteger(event.data.stage)) {
+        failValidation('stage 必须是正整数', context);
+      }
+      if (!isNonEmptyString(event.data.artifact)) {
+        failValidation('artifact 必须是非空字符串', context);
+      }
+      break;
+    case EVENT_TYPES.GATE_EVALUATED:
+      if (!isPositiveInteger(event.data.stage)) {
+        failValidation('stage 必须是正整数', context);
+      }
+      if (!isNonEmptyString(event.data.gate)) {
+        failValidation('gate 必须是非空字符串', context);
+      }
+      if (!isBoolean(event.data.passed)) {
+        failValidation('passed 必须是布尔值', context);
+      }
+      if (event.data.checks !== undefined && !Array.isArray(event.data.checks)) {
+        failValidation('checks 必须是数组', context);
+      }
+      break;
+    case EVENT_TYPES.AGENT_STARTED:
+    case EVENT_TYPES.AGENT_COMPLETED:
+      if (!isPositiveInteger(event.data.stage)) {
+        failValidation('stage 必须是正整数', context);
+      }
+      if (!isNonEmptyString(event.data.agent)) {
+        failValidation('agent 必须是非空字符串', context);
+      }
+      break;
+    case EVENT_TYPES.AGENT_FAILED:
+    case EVENT_TYPES.AGENT_RETRY_SCHEDULED:
+      if (!isPositiveInteger(event.data.stage)) {
+        failValidation('stage 必须是正整数', context);
+      }
+      if (!isNonEmptyString(event.data.agent)) {
+        failValidation('agent 必须是非空字符串', context);
+      }
+      if (event.data.reason !== undefined && event.data.reason !== null && typeof event.data.reason !== 'string') {
+        failValidation('reason 必须是字符串或 null', context);
+      }
+      break;
+    case EVENT_TYPES.REVISION_REQUESTED:
+      if (!isNonEmptyString(event.data.from)) {
+        failValidation('from 必须是非空字符串', context);
+      }
+      if (!isNonEmptyString(event.data.to)) {
+        failValidation('to 必须是非空字符串', context);
+      }
+      if (!isNonEmptyString(event.data.artifact)) {
+        failValidation('artifact 必须是非空字符串', context);
+      }
+      if (!isNonEmptyString(event.data.reason)) {
+        failValidation('reason 必须是非空字符串', context);
+      }
+      break;
+    case EVENT_TYPES.PLUGIN_DISCOVERED:
+    case EVENT_TYPES.PLUGIN_ACTIVATED:
+      validatePluginSummary(event.data.plugin, `${context}.plugin`);
+      break;
+    case EVENT_TYPES.PLUGINS_REGISTERED:
+      if (!Array.isArray(event.data.plugins)) {
+        failValidation('plugins 必须是数组', context);
+      }
+      for (const plugin of event.data.plugins) {
+        validatePluginSummary(plugin, `${context}.plugins`);
+      }
+      break;
+    default:
+      break;
+  }
+}
+
+function validateExecutionState(state, feature) {
+  if (!isObject(state)) {
+    failValidation('execution state 必须是对象');
+  }
+  if (!isNonEmptyString(state.schemaVersion)) {
+    failValidation('execution.schemaVersion 必须是非空字符串');
+  }
+  if (state.feature !== feature) {
+    failValidation(`execution.feature 必须为 ${feature}`);
+  }
+  if (!Object.values(PIPELINE_STATUS).includes(state.status)) {
+    failValidation(`execution.status 无效: ${JSON.stringify(state.status)}`);
+  }
+  if (!isObject(state.stages)) {
+    failValidation('execution.stages 必须是对象');
+  }
+  if (!isObject(state.qualityGates)) {
+    failValidation('execution.qualityGates 必须是对象');
+  }
+  if (!isObject(state.metrics)) {
+    failValidation('execution.metrics 必须是对象');
+  }
+  if (!Array.isArray(state.plugins)) {
+    failValidation('execution.plugins 必须是数组');
+  }
+  if (!isObject(state.pluginLifecycle)) {
+    failValidation('execution.pluginLifecycle 必须是对象');
+  }
+  if (!Array.isArray(state.pluginLifecycle.discovered)) {
+    failValidation('execution.pluginLifecycle.discovered 必须是数组');
+  }
+  if (!Array.isArray(state.pluginLifecycle.activated)) {
+    failValidation('execution.pluginLifecycle.activated 必须是数组');
+  }
 }
 
 function applyEvent(currentState, event, feature) {
@@ -162,6 +362,22 @@ function applyEvent(currentState, event, feature) {
       if (!initial.createdAt) initial.createdAt = event.timestamp || '';
       if (!initial.feature) initial.feature = feature;
       return initial;
+    }
+
+    case EVENT_TYPES.PACK_APPLIED: {
+      const eventData = isObject(event.data) ? event.data : {};
+      const config = isObject(eventData.config) ? eventData.config : {};
+      const parameters = isObject(eventData.parameters) ? eventData.parameters : {};
+      const derived = {
+        pipelinePack: eventData.pack || 'default',
+        pipelinePackVersion: eventData.version || '',
+        enabledStages: Array.isArray(config.stages) ? clone(config.stages) : [],
+        enabledGates: Array.isArray(config.gates) ? clone(config.gates) : [],
+        activeAgents: Array.isArray(config.agents) ? clone(config.agents) : [],
+        packConfig: clone(config)
+      };
+      state.parameters = mergeDeep(state.parameters || {}, mergeDeep(derived, parameters));
+      return state;
     }
 
     case EVENT_TYPES.STAGE_STARTED: {
@@ -281,6 +497,27 @@ function applyEvent(currentState, event, feature) {
       return state;
     }
 
+    case EVENT_TYPES.PLUGIN_DISCOVERED: {
+      if (!state.pluginLifecycle || typeof state.pluginLifecycle !== 'object') {
+        state.pluginLifecycle = { discovered: [], activated: [] };
+      }
+      state.pluginLifecycle.discovered = normalizePlugins(
+        (state.pluginLifecycle.discovered || []).concat(event.data.plugin || {})
+      );
+      return state;
+    }
+
+    case EVENT_TYPES.PLUGIN_ACTIVATED: {
+      if (!state.pluginLifecycle || typeof state.pluginLifecycle !== 'object') {
+        state.pluginLifecycle = { discovered: [], activated: [] };
+      }
+      state.pluginLifecycle.activated = normalizePlugins(
+        (state.pluginLifecycle.activated || []).concat(event.data.plugin || {})
+      );
+      state.plugins = normalizePlugins((state.plugins || []).concat(event.data.plugin || {}));
+      return state;
+    }
+
     case EVENT_TYPES.PLUGINS_REGISTERED: {
       state.plugins = normalizePlugins(event.data.plugins);
       return state;
@@ -335,6 +572,11 @@ function finalizeState(state) {
   }
 
   state.plugins = normalizePlugins(state.plugins);
+  if (!state.pluginLifecycle || typeof state.pluginLifecycle !== 'object') {
+    state.pluginLifecycle = { discovered: [], activated: [] };
+  }
+  state.pluginLifecycle.discovered = normalizePlugins(state.pluginLifecycle.discovered);
+  state.pluginLifecycle.activated = normalizePlugins(state.pluginLifecycle.activated);
   return state;
 }
 
@@ -344,8 +586,16 @@ function readEvents(eventsFile) {
   return raw
     .split('\n')
     .filter(Boolean)
-    .map(line => JSON.parse(line))
-    .filter(event => EVENT_TYPE_VALUES.includes(event.type));
+    .map((line, index) => {
+      let event;
+      try {
+        event = JSON.parse(line);
+      } catch (err) {
+        failValidation(`第 ${index + 1} 条事件不是合法 JSON: ${err.message}`);
+      }
+      validateEvent(event);
+      return event;
+    });
 }
 
 function materializeState(feature, cwd = process.cwd()) {
@@ -369,6 +619,7 @@ function materializeState(feature, cwd = process.cwd()) {
   }
 
   state = finalizeState(state);
+  validateExecutionState(state, feature);
   fs.writeFileSync(execJsonPath, JSON.stringify(state, null, 2) + '\n', 'utf8');
 
   return {

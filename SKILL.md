@@ -29,7 +29,7 @@ user-invocable: true
 3. **产物驱动** — 每个阶段产出文档，下一阶段基于前一阶段产物
 4. **测试先行** — 每个功能必须有测试，遵循测试金字塔
 5. **质量门禁** — 门禁由 Harness Gate Engine 程序化判定，不可绕过
-6. **状态可追踪** — 每个阶段的开始、完成、失败、重试都通过 Harness 脚本写入 `execution.json`
+6. **状态可追踪** — 每个阶段的开始、完成、失败、重试都先追加到事件流，再物化为只读的 `execution.json`
 7. **能力发现** — 每个 Agent 执行前主动发现环境中可用的 Skill，按需调用以增强能力
 8. **插件可扩展** — 通过 Harness 插件协议注册额外的 gate、agent 或 pipeline 模板包
 9. **子代理标准协议** — 所有子代理必须使用 `DONE / DONE_WITH_CONCERNS / NEEDS_CONTEXT / BLOCKED` 状态报告（详见 `agents/prompts/subagent-protocol.md`）
@@ -79,7 +79,7 @@ pending → skipped（被 --skip-* 或 --continue-from 跳过）
 - `retrying → running`：重试开始
 - `completed → running`：回退重跑
 
-每次状态变更通过 `scripts/harness/update-stage.sh` 原子写入 `.meta/execution.json`。
+每次状态变更通过 `scripts/harness/update-stage.sh` 追加事件并物化 `.meta/execution.json`。
 
 ---
 
@@ -190,6 +190,18 @@ Copy this checklist and check off items as you complete them:
 | `scripts/report/generate-summary.sh` | 解析 execution.json 生成流水线报告 |
 | `scripts/harness/load-plugins.sh` | 扫描并加载已注册的 Harness 插件 |
 
+### Runtime/CLI 编排对照
+
+运行时编排以 `runtime/cli/*.js` + `runtime/cli/lib/pipeline-runtime.js` 为准；shell 入口主要用于兼容，不是逐项行为等价。
+
+| 编排动作 | Shell 入口（兼容层） | Runtime CLI | Runtime API |
+|---------|----------------------|-------------|-------------|
+| 初始化流水线 | `scripts/init-project.sh`（bootstrap：脚手架占位 + 调用 runtime init） | `runtime/cli/init-pipeline.js` | `initPipeline(feature)` |
+| 阶段状态变更 | `scripts/harness/update-stage.sh` | `runtime/cli/update-stage.js` | `updateStage(feature, stage, status, options)` |
+| 记录产物 | 无直接稳定等价包装（`update-stage.sh --artifact` 为阶段更新附带记录） | `runtime/cli/record-artifact.js` | `recordArtifact(feature, artifact, stage)` |
+| Agent 状态变更 | `scripts/harness/update-agent.sh` | `runtime/cli/update-agent.js` | `updateAgent(feature, stage, agent, status, options)` |
+| 门禁评估 | `scripts/gates/gate-runner.sh` | `runtime/cli/evaluate-gates.js` | `evaluateGates(feature, gate, options)` |
+
 ## Claude Code Hooks（Agent 生命周期集成）
 
 Boss Skill 通过 Claude Code 的 hooks 机制，在 Agent 生命周期的关键节点自动介入流水线管控。
@@ -216,7 +228,7 @@ hooks 定义在两处：
 | `session:start` | SessionStart (startup) | all | 检测活跃流水线 + 加载上次 session 状态，注入上下文 |
 | `session:resume` | SessionStart (resume) | all | 恢复会话时提示未完成的流水线 |
 | `pre:write:artifact-guard` | PreToolUse (Write\|Edit) | standard,strict | 阻止直接编辑 execution.json；写入产物时校验阶段状态 |
-| `post:write:artifact-track` | PostToolUse (Write) | standard,strict | 文件写入 `.boss/` 后自动追加产物事件并物化 execution.json |
+| `post:write:artifact-track` | PostToolUse (Write) | standard,strict | 文件写入 `.boss/` 后自动追加产物事件并物化 execution.json read model |
 | `post:bash:context` | PostToolUse (Bash) | standard,strict | 捕获门禁/测试/harness 命令执行，注入上下文 |
 | `subagent:start` | SubagentStart | all | 子 Agent 启动时注入当前流水线阶段上下文 |
 | `subagent:stop` | SubagentStop | all | 子 Agent 结束后记录执行日志到 agent-log.jsonl |

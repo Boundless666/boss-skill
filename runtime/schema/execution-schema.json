@@ -3,7 +3,7 @@
   "$id": "https://boss-skill.local/schema/execution-schema.json",
   "title": "Boss Execution State",
   "type": "object",
-  "required": ["schemaVersion", "feature", "status", "stages", "qualityGates", "metrics", "plugins"],
+  "required": ["schemaVersion", "feature", "status", "stages", "qualityGates", "metrics", "plugins", "pluginLifecycle"],
   "properties": {
     "schemaVersion": { "type": "string" },
     "feature": { "type": "string" },
@@ -13,7 +13,23 @@
       "type": "string",
       "enum": ["initialized", "running", "completed", "failed"]
     },
-    "parameters": { "type": "object" },
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "pipelinePack": { "type": "string" },
+        "pipelinePackVersion": { "type": "string" },
+        "enabledStages": { "type": "array", "items": { "type": "integer" } },
+        "enabledGates": { "type": "array", "items": { "type": "string" } },
+        "activeAgents": { "type": "array", "items": { "type": "string" } },
+        "skipUI": { "type": "boolean" },
+        "skipDeploy": { "type": "boolean" },
+        "skipFrontend": { "type": "boolean" },
+        "skipReview": { "type": "boolean" },
+        "roles": { "type": "string" },
+        "packConfig": { "type": "object" }
+      },
+      "additionalProperties": true
+    },
     "stages": {
       "type": "object",
       "additionalProperties": {
@@ -67,8 +83,21 @@
         "properties": {
           "name": { "type": "string" },
           "version": { "type": "string" },
-          "type": { "type": "string" }
+          "type": { "type": "string" },
+          "dependencies": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "manifestPath": { "type": "string" }
         }
+      }
+    },
+    "pluginLifecycle": {
+      "type": "object",
+      "required": ["discovered", "activated"],
+      "properties": {
+        "discovered": { "$ref": "#/properties/plugins" },
+        "activated": { "$ref": "#/properties/plugins" }
       }
     },
     "humanInterventions": { "type": "array" },

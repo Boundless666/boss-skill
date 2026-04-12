@@ -16,7 +16,7 @@ Boss Harness - 插件加载器
   --list                 列出所有已注册插件
   --type <type>          按类型过滤：gate | agent | pipeline-pack | reporter
   --validate             验证所有插件的 plugin.json 格式
-  --register <feature>   将已发现的插件注册到 execution.json
+  --register <feature>   追加插件注册事件并物化 read model（execution.json）
   --run-hook <hook> <feature> [stage]   执行指定 hook
 
 钩子类型:
@@ -34,7 +34,16 @@ Boss Harness - 插件加载器
 EOF
 }
 
-PLUGIN_DIR="$REPO_ROOT/harness/plugins"
+resolve_plugin_dir() {
+    local cwd_plugin_dir="$(pwd)/harness/plugins"
+    if [[ -d "$cwd_plugin_dir" ]]; then
+        echo "$cwd_plugin_dir"
+        return
+    fi
+    echo "$REPO_ROOT/harness/plugins"
+}
+
+PLUGIN_DIR="$(resolve_plugin_dir)"
 
 find_plugins() {
     local type_filter="${1:-}"
@@ -93,89 +102,22 @@ done
 
 case "$ACTION" in
     list)
-        FOUND=0
-        for pj in $(find_plugins "$TYPE_FILTER"); do
-            name=$(jq -r '.name' "$pj")
-            version=$(jq -r '.version' "$pj")
-            type=$(jq -r '.type' "$pj")
-            desc=$(jq -r '.description // "—"' "$pj")
-            echo "  $name@$version ($type) — $desc"
-            FOUND=$((FOUND + 1))
-        done
-
-        if [[ "$FOUND" -eq 0 ]]; then
-            info "未发现已注册插件（在 harness/plugins/ 中放置 plugin.json）"
-        else
-            info "共发现 $FOUND 个插件"
-        fi
+        CLI_ARGS=(--list)
+        [[ -n "$TYPE_FILTER" ]] && CLI_ARGS+=(--type "$TYPE_FILTER")
+        node "$REPO_ROOT/runtime/cli/register-plugins.js" "${CLI_ARGS[@]}"
         ;;
 
     validate)
-        SCHEMA="$REPO_ROOT/harness/plugin-schema.json"
-        ALL_VALID=true
-
-        for pj in $(find_plugins "$TYPE_FILTER"); do
-            name=$(jq -r '.name' "$pj" 2>/dev/null)
-            type=$(jq -r '.type' "$pj" 2>/dev/null)
-            version=$(jq -r '.version' "$pj" 2>/dev/null)
-
-            if [[ -z "$name" || "$name" == "null" ]]; then
-                warn "无效插件（缺少 name）: $pj"
-                ALL_VALID=false
-                continue
-            fi
-
-            if [[ -z "$type" || "$type" == "null" ]]; then
-                warn "无效插件（缺少 type）: $name"
-                ALL_VALID=false
-                continue
-            fi
-
-            if [[ "$type" == "gate" ]]; then
-                gate_script=$(jq -r '.hooks.gate // empty' "$pj")
-                if [[ -z "$gate_script" ]]; then
-                    warn "$name: type=gate 但未定义 hooks.gate"
-                    ALL_VALID=false
-                else
-                    plugin_dir=$(dirname "$pj")
-                    if [[ ! -f "$plugin_dir/$gate_script" ]]; then
-                        warn "$name: hooks.gate 指向不存在的文件: $gate_script"
-                        ALL_VALID=false
-                    fi
-                fi
-            fi
-
-            success "$name@$version ($type) — 有效"
-        done
-
-        if [[ "$ALL_VALID" == true ]]; then
-            success "所有插件验证通过"
-        else
-            error "部分插件验证失败"
-        fi
+        CLI_ARGS=(--validate)
+        [[ -n "$TYPE_FILTER" ]] && CLI_ARGS+=(--type "$TYPE_FILTER")
+        node "$REPO_ROOT/runtime/cli/register-plugins.js" "${CLI_ARGS[@]}"
         ;;
 
     register)
         [[ -z "$FEATURE" ]] && error "--register 需要指定 feature"
-        EXEC_JSON=".boss/$FEATURE/.meta/execution.json"
-        [[ -f "$EXEC_JSON" ]] || error "未找到执行文件: $EXEC_JSON"
-        command -v jq >/dev/null 2>&1 || error "需要 jq 工具"
-
-        PLUGINS="[]"
-        for pj in $(find_plugins ""); do
-            name=$(jq -r '.name' "$pj")
-            version=$(jq -r '.version' "$pj")
-            type=$(jq -r '.type' "$pj")
-            PLUGINS=$(echo "$PLUGINS" | jq --arg n "$name" --arg v "$version" --arg t "$type" \
-                '. += [{"name": $n, "version": $v, "type": $t}]')
-        done
-
-        EVENT_DATA=$(jq -cn --argjson plugins "$PLUGINS" '{plugins: $plugins}')
-        "$SCRIPT_DIR/append-event.sh" "$FEATURE" PluginsRegistered --data "$EVENT_DATA" >/dev/null
-        "$SCRIPT_DIR/materialize-state.sh" "$FEATURE" >/dev/null
-
-        COUNT=$(echo "$PLUGINS" | jq 'length')
-        success "已注册 $COUNT 个插件到 $EXEC_JSON"
+        CLI_ARGS=(--register "$FEATURE")
+        [[ -n "$TYPE_FILTER" ]] && CLI_ARGS+=(--type "$TYPE_FILTER")
+        node "$REPO_ROOT/runtime/cli/register-plugins.js" "${CLI_ARGS[@]}"
         ;;
 
     run-hook)

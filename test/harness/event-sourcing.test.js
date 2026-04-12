@@ -124,6 +124,20 @@ describe('event-sourcing', () => {
     });
   });
 
+  it('append-event.sh accepts plugin lifecycle event types from the runtime catalog', () => {
+    runScript(APPEND_SCRIPT, `test-feat PluginDiscovered --data '${JSON.stringify({
+      plugin: { name: 'security-audit', version: '1.0.0', type: 'gate' }
+    })}'`);
+    runScript(APPEND_SCRIPT, `test-feat PluginActivated --data '${JSON.stringify({
+      plugin: { name: 'security-audit', version: '1.0.0', type: 'gate' }
+    })}'`);
+
+    const eventsFile = path.join(tmpDir, '.boss', 'test-feat', '.meta', 'events.jsonl');
+    const lines = fs.readFileSync(eventsFile, 'utf8').trim().split('\n');
+    const eventTypes = lines.map((line) => JSON.parse(line).type);
+    assert.deepEqual(eventTypes, ['PipelineInitialized', 'PluginDiscovered', 'PluginActivated']);
+  });
+
   it('materialize handles GateEvaluated events', () => {
     runScript(APPEND_SCRIPT, 'test-feat StageStarted --stage 3');
     runScript(APPEND_SCRIPT, 'test-feat GateEvaluated --gate gate0 --passed true --stage 3');
@@ -166,5 +180,33 @@ describe('event-sourcing', () => {
       path.join(tmpDir, '.boss', 'test-feat', '.meta', 'execution.json'), 'utf8'
     ));
     assert.deepEqual(execJson.plugins, [{ name: 'security-audit', version: '1.0.0', type: 'gate' }]);
+  });
+
+  it('materialize-state.sh rejects malformed ArtifactRecorded events', () => {
+    const eventsFile = path.join(tmpDir, '.boss', 'test-feat', '.meta', 'events.jsonl');
+    fs.appendFileSync(eventsFile, `${JSON.stringify({
+      id: 2,
+      type: 'ArtifactRecorded',
+      timestamp: '2024-01-01T00:00:01Z',
+      data: { artifact: 'prd.md' }
+    })}\n`, 'utf8');
+
+    assert.throws(() => {
+      runScript(MATERIALIZE_SCRIPT, 'test-feat');
+    }, /ArtifactRecorded.*stage/);
+  });
+
+  it('materialize-state.sh rejects malformed GateEvaluated events', () => {
+    const eventsFile = path.join(tmpDir, '.boss', 'test-feat', '.meta', 'events.jsonl');
+    fs.appendFileSync(eventsFile, `${JSON.stringify({
+      id: 2,
+      type: 'GateEvaluated',
+      timestamp: '2024-01-01T00:00:01Z',
+      data: { gate: 'gate0', stage: 3 }
+    })}\n`, 'utf8');
+
+    assert.throws(() => {
+      runScript(MATERIALIZE_SCRIPT, 'test-feat');
+    }, /GateEvaluated.*passed/);
   });
 });

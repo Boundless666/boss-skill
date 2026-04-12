@@ -267,89 +267,9 @@ cat > "$TARGET_DIR/deploy-report.md" << EOF
 
 EOF
 
-# 执行追踪元数据（Harness Engineer v0.2+ schema，事件溯源）
-NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-cat > "$TARGET_DIR/.meta/execution.json" << EOF
-{
-  "schemaVersion": "0.2.0",
-  "feature": "$FEATURE_NAME",
-  "createdAt": "$NOW",
-  "updatedAt": "$NOW",
-  "status": "initialized",
-  "parameters": {
-    "skipUI": false,
-    "skipDeploy": false,
-    "quick": false,
-    "hitlLevel": "auto",
-    "roles": "full"
-  },
-  "stages": {
-    "1": {
-      "name": "planning",
-      "status": "pending",
-      "startTime": null,
-      "endTime": null,
-      "retryCount": 0,
-      "maxRetries": 2,
-      "failureReason": null,
-      "artifacts": [],
-      "gateResults": {}
-    },
-    "2": {
-      "name": "review",
-      "status": "pending",
-      "startTime": null,
-      "endTime": null,
-      "retryCount": 0,
-      "maxRetries": 2,
-      "failureReason": null,
-      "artifacts": [],
-      "gateResults": {}
-    },
-    "3": {
-      "name": "development",
-      "status": "pending",
-      "startTime": null,
-      "endTime": null,
-      "retryCount": 0,
-      "maxRetries": 2,
-      "failureReason": null,
-      "artifacts": [],
-      "gateResults": {}
-    },
-    "4": {
-      "name": "deployment",
-      "status": "pending",
-      "startTime": null,
-      "endTime": null,
-      "retryCount": 0,
-      "maxRetries": 2,
-      "failureReason": null,
-      "artifacts": [],
-      "gateResults": {}
-    }
-  },
-  "qualityGates": {
-    "gate0": { "status": "pending", "passed": null, "checks": [], "executedAt": null },
-    "gate1": { "status": "pending", "passed": null, "checks": [], "executedAt": null },
-    "gate2": { "status": "pending", "passed": null, "checks": [], "executedAt": null }
-  },
-  "metrics": {
-    "totalDuration": null,
-    "stageTimings": {},
-    "gatePassRate": null,
-    "retryTotal": 0
-  },
-  "plugins": [],
-  "humanInterventions": [],
-  "revisionRequests": [],
-  "feedbackLoops": { "maxRounds": 2, "currentRound": 0 }
-}
-EOF
-
-# 创建事件日志（事件溯源）
-INIT_EVENT="{\"id\":1,\"type\":\"PipelineInitialized\",\"timestamp\":\"$NOW\",\"data\":{\"initialState\":$(cat "$TARGET_DIR/.meta/execution.json" | jq -c .)}}"
-echo "$INIT_EVENT" > "$TARGET_DIR/.meta/events.jsonl"
+# 初始化运行时元数据与事件流
+command -v node >/dev/null 2>&1 || error "需要 node 才能运行初始化流程"
+node "$REPO_ROOT/runtime/cli/init-pipeline.js" "$FEATURE_NAME" >/dev/null
 
     # 完成
     success "Boss Mode 项目目录初始化完成！"

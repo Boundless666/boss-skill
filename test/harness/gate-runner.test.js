@@ -76,7 +76,7 @@ describe('gate-runner', () => {
   }
 
   it('appends a GateEvaluated event and materializes quality gate state', () => {
-    runScript('test-feat gate1');
+    const output = runScript('test-feat gate1');
 
     const events = fs.readFileSync(path.join(tmpDir, '.boss', 'test-feat', '.meta', 'events.jsonl'), 'utf8')
       .trim()
@@ -98,5 +98,11 @@ describe('gate-runner', () => {
     assert.equal(execJson.qualityGates.gate1.passed, true);
     assert.deepEqual(execJson.qualityGates.gate1.checks, events[1].data.checks);
     assert.equal(execJson.metrics.gatePassRate, 100);
+
+    const parsed = JSON.parse(output);
+    assert.equal(parsed.feature, 'test-feat');
+    assert.equal(parsed.gate, 'gate1');
+    assert.equal(parsed.passed, true);
+    assert.deepEqual(parsed.checks, events[1].data.checks);
   });
 });

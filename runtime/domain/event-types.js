@@ -2,6 +2,7 @@
 
 const EVENT_TYPES = Object.freeze({
   PIPELINE_INITIALIZED: 'PipelineInitialized',
+  PACK_APPLIED: 'PackApplied',
   STAGE_STARTED: 'StageStarted',
   STAGE_COMPLETED: 'StageCompleted',
   STAGE_FAILED: 'StageFailed',
@@ -14,6 +15,8 @@ const EVENT_TYPES = Object.freeze({
   AGENT_FAILED: 'AgentFailed',
   AGENT_RETRY_SCHEDULED: 'AgentRetryScheduled',
   REVISION_REQUESTED: 'RevisionRequested',
+  PLUGIN_DISCOVERED: 'PluginDiscovered',
+  PLUGIN_ACTIVATED: 'PluginActivated',
   PLUGINS_REGISTERED: 'PluginsRegistered'
 });
 
