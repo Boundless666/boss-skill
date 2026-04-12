@@ -177,22 +177,16 @@ describe('runtime report generation', () => {
     assert.match(result.stdout, /progress flow/i);
   });
 
-  it('shell wrapper remains compatible and writes markdown/json report files', () => {
-    const scriptPath = path.join(REPO_ROOT, 'scripts', 'report', 'generate-summary.sh');
+  it('generate-summary runtime CLI writes markdown/json report files', () => {
+    const cliPath = path.join(REPO_ROOT, 'runtime', 'cli', 'generate-summary.js');
 
-    const mdResult = spawnSync('bash', [scriptPath, 'test-feat'], {
-      cwd: tmpDir,
-      encoding: 'utf8'
-    });
+    const mdResult = runNode(cliPath, ['test-feat']);
     assert.equal(mdResult.status, 0, mdResult.stderr);
     const markdownPath = path.join(tmpDir, '.boss', 'test-feat', 'summary-report.md');
     assert.equal(fs.existsSync(markdownPath), true);
     assert.match(fs.readFileSync(markdownPath, 'utf8'), /# 流水线执行报告/);
 
-    const jsonResult = spawnSync('bash', [scriptPath, 'test-feat', '--json'], {
-      cwd: tmpDir,
-      encoding: 'utf8'
-    });
+    const jsonResult = runNode(cliPath, ['test-feat', '--json']);
     assert.equal(jsonResult.status, 0, jsonResult.stderr);
     const jsonPath = path.join(tmpDir, '.boss', 'test-feat', 'summary-report.json');
     assert.equal(fs.existsSync(jsonPath), true);

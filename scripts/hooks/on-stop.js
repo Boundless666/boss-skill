@@ -35,7 +35,7 @@ function run(rawInput) {
   for (const info of pendingStages) {
     reason += `  - ${info}\n`;
   }
-  reason += '请先完成当前阶段或使用 update-stage.sh 更新状态后再停止。';
+  reason += '请先完成当前阶段或使用 runtime/cli/update-stage.js 更新状态后再停止。';
 
   return JSON.stringify({
     decision: 'block',

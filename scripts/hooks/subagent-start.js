@@ -1,10 +1,8 @@
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
 const { findActiveFeature, readExecJson, AGENT_STAGE_MAP } = require('../lib/boss-utils');
 const { emitProgress } = require('../lib/progress-emitter');
-const { execSync } = require('child_process');
+const runtime = require('../../runtime/cli/lib/pipeline-runtime');
 
 function run(rawInput) {
   const input = JSON.parse(rawInput);
@@ -38,12 +36,7 @@ function run(rawInput) {
       data: { agent: agentType, stage: parseInt(currentStage) }
     });
     try {
-      const scriptPath = path.join(__dirname, '..', 'harness', 'update-agent.sh');
-      execSync(`bash "${scriptPath}" "${active.feature}" "${currentStage}" "${agentType}" running`, {
-        cwd,
-        encoding: 'utf8',
-        stdio: ['pipe', 'pipe', 'pipe']
-      });
+      runtime.updateAgent(active.feature, currentStage, agentType, 'running', { cwd });
     } catch (err) {
       process.stderr.write('[boss-skill] subagent-start/update-agent: ' + err.message + '\n');
     }

@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { findActiveFeature, readExecJson, AGENT_STAGE_MAP } = require('../lib/boss-utils');
 const { emitProgress } = require('../lib/progress-emitter');
-const { execSync } = require('child_process');
+const runtime = require('../../runtime/cli/lib/pipeline-runtime');
 
 function parseStructuredStatus(message) {
   const match = message.match(/\[BOSS_STATUS\]([\s\S]*?)\[\/BOSS_STATUS\]/i);
@@ -27,15 +27,7 @@ function parseStructuredStatus(message) {
 
 function parseStatus(message) {
   const structured = parseStructuredStatus(message);
-  if (structured) {
-    return structured;
-  }
-
-  const statusMatch = message.match(/\b(REVISION_NEEDED|DONE_WITH_CONCERNS|DONE|BLOCKED|NEEDS_CONTEXT)\b/);
-  return {
-    status: statusMatch ? statusMatch[1] : '',
-    reason: ''
-  };
+  return structured || { status: '', reason: '' };
 }
 
 function run(rawInput) {
@@ -103,15 +95,10 @@ function run(rawInput) {
         });
 
         const failureReason = parsedStatus.reason || parsedStatus.status || '';
-        const reasonArg = agentStatus === 'failed' && failureReason
-          ? ` --reason "${failureReason}"` : '';
-
         try {
-          const scriptPath = path.join(__dirname, '..', 'harness', 'update-agent.sh');
-          execSync(`bash "${scriptPath}" "${active.feature}" "${currentStage}" "${agentType}" ${agentStatus}${reasonArg}`, {
+          runtime.updateAgent(active.feature, currentStage, agentType, agentStatus, {
             cwd,
-            encoding: 'utf8',
-            stdio: ['pipe', 'pipe', 'pipe']
+            reason: agentStatus === 'failed' ? failureReason : ''
           });
         } catch (err) {
           process.stderr.write('[boss-skill] subagent-stop/update-agent: ' + err.message + '\n');

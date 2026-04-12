@@ -53,7 +53,7 @@ describe('subagent-stop hook', () => {
     assert.ok(fs.existsSync(logFile));
   });
 
-  it('prefers structured boss status blocks over regex fallback', () => {
+  it('requires structured boss status blocks for boss agents', () => {
     const execData = createExecData({
       feature: 'test-feat',
       status: 'running',
@@ -89,5 +89,31 @@ describe('subagent-stop hook', () => {
     const entry = JSON.parse(fs.readFileSync(logFile, 'utf8').trim());
     assert.equal(entry.status, 'BLOCKED');
     assert.equal(entry.reason, 'waiting-for-schema');
+  });
+
+  it('treats missing structured status blocks as failed without fallback parsing', () => {
+    const execData = createExecData({
+      feature: 'test-feat',
+      status: 'running',
+      stages: {
+        '1': { name: 'Planning', status: 'completed', artifacts: [] },
+        '2': { name: 'Review', status: 'running', artifacts: [] },
+        '3': { name: 'Development', status: 'pending', artifacts: [] },
+        '4': { name: 'Deployment', status: 'pending', artifacts: [] }
+      }
+    });
+    tmpDir = createTempBossDir('test-feat', execData);
+
+    hook.run(JSON.stringify({
+      cwd: tmpDir,
+      agent_type: 'boss-tech-lead',
+      agent_id: 'agent-790',
+      last_assistant_message: 'DONE'
+    }));
+
+    const execJson = JSON.parse(
+      fs.readFileSync(path.join(tmpDir, '.boss', 'test-feat', '.meta', 'execution.json'), 'utf8')
+    );
+    assert.equal(execJson.stages['2'].agents['boss-tech-lead'].status, 'failed');
   });
 });

@@ -18,6 +18,7 @@ describe('phase-1 direct-write guard', () => {
       'scripts/hooks/post-tool-write.js',
       'scripts/gates/gate-runner.sh',
       'runtime/cli/evaluate-gates.js',
+      'runtime/cli/lib/pipeline-runtime.js',
       'runtime/cli/register-plugins.js',
       'scripts/harness/load-plugins.sh'
     ];
@@ -38,6 +39,33 @@ describe('phase-1 direct-write guard', () => {
     }
   });
 
+  it('keeps runtime-first writer paths free of shell wrapper orchestration', () => {
+    const runtimeFirstFiles = [
+      'scripts/hooks/post-tool-write.js',
+      'runtime/cli/lib/pipeline-runtime.js',
+      'scripts/hooks/subagent-start.js',
+      'scripts/hooks/subagent-stop.js'
+    ];
+
+    const wrapperPatterns = [
+      /append-event\.sh/,
+      /materialize-state\.sh/,
+      /update-stage\.sh/,
+      /update-agent\.sh/
+    ];
+
+    for (const relativePath of runtimeFirstFiles) {
+      const source = read(relativePath);
+      for (const pattern of wrapperPatterns) {
+        assert.doesNotMatch(
+          source,
+          pattern,
+          `${relativePath} should use runtime APIs directly instead of shell wrappers`
+        );
+      }
+    }
+  });
+
   it('plugin registration help describes event-sourced read-model semantics', () => {
     const registerPluginsCli = path.join(REPO_ROOT, 'runtime', 'cli', 'register-plugins.js');
     const registerResult = spawnSync('node', [registerPluginsCli, '--help'], {
@@ -47,14 +75,5 @@ describe('phase-1 direct-write guard', () => {
     assert.equal(registerResult.status, 0, registerResult.stderr);
     assert.match(registerResult.stdout, /事件/);
     assert.match(registerResult.stdout, /read model/);
-
-    const loadPluginsWrapper = path.join(REPO_ROOT, 'scripts', 'harness', 'load-plugins.sh');
-    const wrapperResult = spawnSync('bash', [loadPluginsWrapper, '--help'], {
-      cwd: REPO_ROOT,
-      encoding: 'utf8'
-    });
-    assert.equal(wrapperResult.status, 0, wrapperResult.stderr);
-    assert.match(wrapperResult.stdout, /事件/);
-    assert.match(wrapperResult.stdout, /read model/);
   });
 });

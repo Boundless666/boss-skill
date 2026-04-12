@@ -2,9 +2,9 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execFileSync } = require('child_process');
 const { STAGE_MAP } = require('../lib/boss-utils');
 const { emitProgress } = require('../lib/progress-emitter');
+const runtime = require('../../runtime/cli/lib/pipeline-runtime');
 
 function hasArtifactInEventLog(eventsPath, artifact, stage) {
   if (!fs.existsSync(eventsPath)) return false;
@@ -67,17 +67,7 @@ function run(rawInput) {
   });
 
   try {
-    const appendScript = path.join(__dirname, '..', 'harness', 'append-event.sh');
-    const materializeScript = path.join(__dirname, '..', 'harness', 'materialize-state.sh');
-
-    execFileSync('bash', [appendScript, feature, 'ArtifactRecorded', '--artifact', artifact, '--stage', String(stage)], {
-      cwd,
-      stdio: 'pipe'
-    });
-    execFileSync('bash', [materializeScript, feature], {
-      cwd,
-      stdio: 'pipe'
-    });
+    runtime.recordArtifact(feature, artifact, stage, { cwd });
   } catch (err) {
     process.stderr.write('[boss-skill] post-tool-write/materialize: ' + err.message + '\n');
     return '';

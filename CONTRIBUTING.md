@@ -30,7 +30,7 @@ npm test
 | `runtime/` | Canonical runtime CLI、inspection、report、projector、schema |
 | `scripts/lib/` | 共享库（`common.sh` Shell 工具、`boss-utils.js` Node.js 工具） |
 | `scripts/hooks/` | 10 个 Claude Code Hook 脚本 |
-| `scripts/harness/` | 流水线阶段管理 Shell 脚本 |
+| `scripts/harness/` | 内部 Shell 辅助脚本（非 public runtime surface） |
 | `scripts/gates/` | 质量门禁脚本 |
 | `harness/` | 插件系统和 Pipeline Pack 配置 |
 | `docs/` | runtime contract、实施计划等设计/迁移文档 |
@@ -87,7 +87,7 @@ try {
 ### Runtime 优先原则
 
 - 需要新增或修改编排行为时，优先改 `runtime/cli/*`、`runtime/cli/lib/*`、`runtime/projectors/*`、`runtime/report/*`。
-- `scripts/harness/*.sh`、`scripts/gates/*.sh`、`scripts/report/*.sh` 默认应作为兼容 wrapper，而不是新的 canonical 业务逻辑承载层。
+- `scripts/harness/*.sh`、`scripts/gates/*.sh`、`scripts/report/*.sh` 只应作为内部辅助层；新的编排语义必须落在 `runtime/cli/*`、`runtime/cli/lib/*`、`runtime/projectors/*`、`runtime/report/*`。
 - 不要直接写 `execution.json`；状态变更必须先进入事件流，再由 projector 物化。
 
 ## 测试
@@ -206,7 +206,7 @@ docs: 更新 README 安装说明
 
 - 插件 Schema：`harness/plugin-schema.json`
 - 内置插件示例：`harness/plugins/security-audit/`
-- 插件加载器：`scripts/harness/load-plugins.sh`
+- 插件注册入口：`runtime/cli/register-plugins.js`
 
 插件目录结构：
 

@@ -1,6 +1,6 @@
 # 质量门禁
 
-Boss Harness Gate Engine 提供三层程序化门禁，由 `scripts/gates/gate-runner.sh` 统一调度。
+Boss Harness Gate Engine 提供三层程序化门禁，由 `runtime/cli/evaluate-gates.js` 统一调度。
 所有门禁结果都会先追加到 `.meta/events.jsonl`，再物化到只读的 `.meta/execution.json` read model 中。
 
 ## Gate 0：代码质量（开发完成后，测试执行前）
@@ -48,16 +48,16 @@ Boss Harness Gate Engine 提供三层程序化门禁，由 `scripts/gates/gate-r
 ## 插件门禁
 
 通过 Harness 插件协议可注册自定义门禁（如安全审计、许可证检查）。
-插件门禁脚本放置在 `harness/plugins/<name>/gate.sh`，由 `gate-runner.sh` 统一调度。
+插件门禁脚本放置在 `harness/plugins/<name>/gate.sh`，由 `evaluate-gates.js` 统一调度。
 
 ## 调用方式
 
 ```bash
-scripts/gates/gate-runner.sh <feature> gate0
-scripts/gates/gate-runner.sh <feature> gate1
-scripts/gates/gate-runner.sh <feature> gate2
-scripts/gates/gate-runner.sh <feature> <plugin-gate-name>
-scripts/gates/gate-runner.sh <feature> gate0 --dry-run
+runtime/cli/evaluate-gates.js <feature> gate0
+runtime/cli/evaluate-gates.js <feature> gate1
+runtime/cli/evaluate-gates.js <feature> gate2
+runtime/cli/evaluate-gates.js <feature> <plugin-gate-name>
+runtime/cli/evaluate-gates.js <feature> gate0 --dry-run
 ```
 
 ## 判断标准
@@ -70,8 +70,8 @@ scripts/gates/gate-runner.sh <feature> gate0 --dry-run
 ## 未通过处理
 
 如果门禁未通过：
-1. gate-runner 自动追加门禁结果事件并物化 `execution.json` read model
-2. Boss Agent 调用 `update-stage.sh` 标记阶段为 `failed`
+1. `evaluate-gates.js` 自动追加门禁结果事件并物化 `execution.json` read model
+2. Boss Agent 调用 `runtime/cli/update-stage.js <feature> 3 failed` 标记阶段为 `failed`
 3. 尝试修复后通过 `retry-stage.sh` 重试
 4. 重新执行对应门禁
 5. 再次检查是否通过

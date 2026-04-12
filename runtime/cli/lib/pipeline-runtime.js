@@ -2,9 +2,9 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execFileSync, spawnSync } = require('child_process');
+const { spawnSync } = require('child_process');
 const { materializeState } = require('../../projectors/materialize-state');
-const { EVENT_TYPES } = require('../../domain/event-types');
+const { EVENT_TYPES, EVENT_TYPE_VALUES } = require('../../domain/event-types');
 const { resolvePipelinePack, getPackStateParameters } = require('./pack-runtime');
 const { registerPlugins: registerPluginsRuntime } = require('./plugin-runtime');
 const { emitProgress } = require('../../../scripts/lib/progress-emitter');
@@ -206,6 +206,12 @@ function initPipeline(feature, { cwd = process.cwd() } = {}) {
   const eventsFile = path.join(metaDir, 'events.jsonl');
   const execExists = fs.existsSync(execJsonPath);
   const eventsExists = fs.existsSync(eventsFile);
+  if (execExists && eventsExists) {
+    throw new Error(`流水线已存在: ${path.relative(cwd, metaDir)}`);
+  }
+  if (execExists || eventsExists) {
+    throw new Error(`检测到不完整的流水线状态: ${path.relative(cwd, metaDir)}`);
+  }
 
   const now = new Date().toISOString();
   const stageState = (name) => ({
@@ -283,92 +289,6 @@ function initPipeline(feature, { cwd = process.cwd() } = {}) {
     }
   };
 
-  if (execExists && !eventsExists) {
-    const existingState = readJson(execJsonPath);
-    const compatibilityState = {
-      ...existingState,
-      feature: existingState.feature || feature,
-      parameters: {
-        ...(existingState.parameters || {}),
-        ...packParameters
-      },
-      updatedAt: now
-    };
-
-    const initEvent = {
-      id: 1,
-      type: EVENT_TYPES.PIPELINE_INITIALIZED,
-      timestamp: existingState.createdAt || now,
-      data: { initialState: compatibilityState }
-    };
-    const events = [initEvent];
-    if (pack.name !== 'default') {
-      events.push({
-        id: 2,
-        type: EVENT_TYPES.PACK_APPLIED,
-        timestamp: now,
-        data: {
-          pack: pack.name,
-          version: pack.version,
-          config: pack.config,
-          parameters: packParameters
-        }
-      });
-    }
-
-    fs.writeFileSync(eventsFile, `${events.map((event) => JSON.stringify(event)).join('\n')}\n`, 'utf8');
-    const { state } = materializeState(feature, cwd);
-    return state;
-  }
-
-  if (!execExists && eventsExists) {
-    const { state } = materializeState(feature, cwd);
-    return state;
-  }
-
-  if (execExists && eventsExists) {
-    const existingState = readExecutionView(cwd, feature);
-    if (existingState.parameters && existingState.parameters.pipelinePack) {
-      return existingState;
-    }
-
-    const { state: rematerializedState } = materializeState(feature, cwd);
-    if (rematerializedState.parameters && rematerializedState.parameters.pipelinePack) {
-      return rematerializedState;
-    }
-
-    if (pack.name === 'default') {
-      appendEvent(eventsFile, {
-        type: EVENT_TYPES.PIPELINE_INITIALIZED,
-        timestamp: now,
-        data: {
-          initialState: {
-            ...rematerializedState,
-            updatedAt: now,
-            parameters: {
-              ...(rematerializedState.parameters || {}),
-              ...packParameters
-            }
-          }
-        }
-      });
-    } else {
-      appendEvent(eventsFile, {
-        type: EVENT_TYPES.PACK_APPLIED,
-        timestamp: now,
-        data: {
-          pack: pack.name,
-          version: pack.version,
-          config: pack.config,
-          parameters: packParameters
-        }
-      });
-    }
-
-    const { state } = materializeState(feature, cwd);
-    return state;
-  }
-
   writeJson(execJsonPath, initializedWithPack);
   const initEvent = {
     id: 1,
@@ -408,11 +328,15 @@ function appendEvent(eventsFile, event) {
   return payload;
 }
 
-function appendEventWithScript(cwd, feature, eventType, args = []) {
-  const scriptPath = path.join(REPO_ROOT, 'scripts', 'harness', 'append-event.sh');
-  execFileSync('bash', [scriptPath, feature, eventType, ...args], {
-    cwd,
-    stdio: 'pipe'
+function appendRuntimeEvent(cwd, feature, eventType, data = {}) {
+  if (!EVENT_TYPE_VALUES.includes(eventType)) {
+    throw new Error(`无效事件类型: ${eventType}`);
+  }
+  const eventsFile = ensureEventsFile(cwd, feature);
+  return appendEvent(eventsFile, {
+    type: eventType,
+    timestamp: new Date().toISOString(),
+    data
   });
 }
 
@@ -555,10 +479,10 @@ function updateStage(feature, stage, status, {
   const eventType = mapStageStatusToEvent(status);
   if (!eventType) throw new Error(`无效状态: ${status}`);
 
-  ensureEventsFile(cwd, feature);
-  const stageArg = ['--stage', String(stageNumber)];
-  const reasonArg = reason ? ['--reason', reason] : [];
-  appendEventWithScript(cwd, feature, eventType, [...stageArg, ...reasonArg]);
+  appendRuntimeEvent(cwd, feature, eventType, {
+    stage: stageNumber,
+    ...(reason ? { reason } : {})
+  });
 
   if (status === 'running') {
     emitProgress(cwd, feature, { type: 'stage-start', data: { stage: stageNumber } });
@@ -570,24 +494,19 @@ function updateStage(feature, stage, status, {
 
   const artifactList = normalizeArtifacts(artifacts);
   for (const artifact of artifactList) {
-    appendEventWithScript(cwd, feature, EVENT_TYPES.ARTIFACT_RECORDED, [
-      '--artifact',
+    appendRuntimeEvent(cwd, feature, EVENT_TYPES.ARTIFACT_RECORDED, {
       artifact,
-      '--stage',
-      String(stageNumber)
-    ]);
+      stage: stageNumber
+    });
   }
 
   const passed = parseGatePassed(gatePassed);
   if (gate && passed !== null) {
-    appendEventWithScript(cwd, feature, EVENT_TYPES.GATE_EVALUATED, [
-      '--gate',
+    appendRuntimeEvent(cwd, feature, EVENT_TYPES.GATE_EVALUATED, {
       gate,
-      '--passed',
-      passed ? 'true' : 'false',
-      '--stage',
-      String(stageNumber)
-    ]);
+      passed,
+      stage: stageNumber
+    });
   }
 
   const { state } = materializeState(feature, cwd);
@@ -609,11 +528,11 @@ function updateAgent(feature, stage, agent, status, {
   const eventType = mapAgentStatusToEvent(status);
   if (!eventType) throw new Error(`无效状态: ${status}`);
 
-  ensureEventsFile(cwd, feature);
-  const stageArg = ['--stage', String(stageNumber)];
-  const agentArg = ['--agent', agent];
-  const reasonArg = reason ? ['--reason', reason] : [];
-  appendEventWithScript(cwd, feature, eventType, [...agentArg, ...stageArg, ...reasonArg]);
+  appendRuntimeEvent(cwd, feature, eventType, {
+    agent,
+    stage: stageNumber,
+    ...(reason ? { reason } : {})
+  });
 
   const { state } = materializeState(feature, cwd);
   return state;
@@ -744,16 +663,12 @@ function evaluateGates(feature, gateName, { cwd = process.cwd(), dryRun = false,
   }
 
   const stage = resolveGateStage(cwd, gateName);
-  appendEventWithScript(cwd, feature, EVENT_TYPES.GATE_EVALUATED, [
-    '--gate',
-    gateName,
-    '--passed',
-    passed ? 'true' : 'false',
-    '--stage',
-    String(stage),
-    '--data',
-    JSON.stringify({ checks })
-  ]);
+  appendRuntimeEvent(cwd, feature, EVENT_TYPES.GATE_EVALUATED, {
+    gate: gateName,
+    passed,
+    stage,
+    checks
+  });
 
   const { state } = materializeState(feature, cwd);
   return {

@@ -5,9 +5,9 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 
-const CHECK_ARTIFACT_SCRIPT = path.join(__dirname, '..', '..', 'scripts', 'harness', 'check-artifact.sh');
+const GET_READY_ARTIFACTS_CLI = path.join(__dirname, '..', '..', 'runtime', 'cli', 'get-ready-artifacts.js');
 const DAG_PATH = path.join(__dirname, '..', '..', 'harness', 'artifact-dag.json');
 
 describe('artifact-dag', () => {
@@ -55,9 +55,9 @@ describe('artifact-dag', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  function runScript(args) {
+  function runCli(args) {
     try {
-      return execSync(`bash "${CHECK_ARTIFACT_SCRIPT}" ${args}`, {
+      return execFileSync('node', [GET_READY_ARTIFACTS_CLI, ...args], {
         encoding: 'utf8',
         cwd: tmpDir,
         env: { ...process.env, PATH: process.env.PATH }
@@ -105,7 +105,7 @@ describe('artifact-dag', () => {
   });
 
   it('--ready returns prd.md initially (design-brief is optional)', () => {
-    const output = runScript(`test-feat --ready --dag "${DAG_PATH}" --json`);
+    const output = runCli(['test-feat', '--ready', '--dag', DAG_PATH, '--json']);
     const ready = JSON.parse(output);
     assert.ok(ready.includes('prd.md'), 'prd.md should be ready initially');
   });
@@ -117,7 +117,7 @@ describe('artifact-dag', () => {
     data.stages['1'].artifacts = ['prd.md'];
     fs.writeFileSync(execPath, JSON.stringify(data, null, 2), 'utf8');
 
-    const output = runScript(`test-feat --ready --dag "${DAG_PATH}" --json`);
+    const output = runCli(['test-feat', '--ready', '--dag', DAG_PATH, '--json']);
     const ready = JSON.parse(output);
     assert.ok(ready.includes('architecture.md'));
     assert.ok(ready.includes('ui-spec.md'));
@@ -127,7 +127,7 @@ describe('artifact-dag', () => {
   it('--can-start checks dependency satisfaction', () => {
     // architecture.md depends on prd.md, which is not done
     assert.throws(() => {
-      runScript(`test-feat architecture.md --can-start --dag "${DAG_PATH}"`);
+      runCli(['test-feat', 'architecture.md', '--can-start', '--dag', DAG_PATH]);
     }, /缺少依赖/);
   });
 
@@ -137,7 +137,7 @@ describe('artifact-dag', () => {
     data.stages['1'].artifacts = ['prd.md'];
     fs.writeFileSync(execPath, JSON.stringify(data, null, 2), 'utf8');
 
-    const output = runScript(`test-feat architecture.md --can-start --dag "${DAG_PATH}"`);
+    const output = runCli(['test-feat', 'architecture.md', '--can-start', '--dag', DAG_PATH]);
     assert.ok(output.includes('可以开始'));
   });
 
@@ -148,7 +148,7 @@ describe('artifact-dag', () => {
     data.stages['1'].artifacts = ['prd.md'];
     fs.writeFileSync(execPath, JSON.stringify(data, null, 2), 'utf8');
 
-    const output = runScript(`test-feat --ready --dag "${DAG_PATH}" --json`);
+    const output = runCli(['test-feat', '--ready', '--dag', DAG_PATH, '--json']);
     const ready = JSON.parse(output);
     assert.ok(!ready.includes('ui-spec.md'), 'ui-spec.md should be skipped');
     assert.ok(ready.includes('architecture.md'));

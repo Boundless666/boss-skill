@@ -79,7 +79,7 @@ pending → skipped（被 --skip-* 或 --continue-from 跳过）
 - `retrying → running`：重试开始
 - `completed → running`：回退重跑
 
-每次状态变更通过 `scripts/harness/update-stage.sh` 追加事件并物化 `.meta/execution.json`。
+每次状态变更通过 runtime CLI 追加事件并物化 `.meta/execution.json`。
 
 ---
 
@@ -118,8 +118,8 @@ Copy this checklist and check off items as you complete them:
 
 - [ ] **DAG 执行循环** — 重复以下步骤直到所有产物完成或被跳过：
 
-  - [ ] **D.1 查询就绪产物**：调用 `scripts/harness/check-artifact.sh <feature> --ready --json` 获取当前所有输入依赖已满足的产物列表
-  - [ ] **D.2 阶段状态管理**：对就绪产物所属的阶段，若阶段状态为 `pending`，调用 `scripts/harness/update-stage.sh <feature> <N> running` 标记阶段开始
+  - [ ] **D.1 查询就绪产物**：调用 `runtime/cli/get-ready-artifacts.js <feature> --ready --json` 获取当前所有输入依赖已满足的产物列表
+  - [ ] **D.2 阶段状态管理**：对就绪产物所属的阶段，若阶段状态为 `pending`，调用 `runtime/cli/update-stage.js <feature> <N> running` 标记阶段开始
   - [ ] **D.3 准备产物骨架**：对每个就绪产物调用 `scripts/prepare-artifact.sh <feature-name> <artifact-name>`
   - [ ] **D.4 并行派发 Agent**：
     - Load `references/artifact-guide.md` 获取产物保存规范
@@ -128,8 +128,8 @@ Copy this checklist and check off items as you complete them:
     - 每个 Agent 调用前 Load 对应的 Agent Prompt 文件 + `agents/shared/agent-protocol.md` + `agents/shared/tech-detection.md`
     - 若产物为 `code`，根据任务类型调用 `boss-frontend` / `boss-backend`（全栈项目并行），同时 Load `references/testing-standards.md`
   - [ ] **D.5 保存产物**：Agent 完成后将产物保存到 `.boss/<feature>/`
-  - [ ] **D.6 标记产物完成**：调用 `scripts/harness/update-stage.sh <feature> <N> completed --artifact <name>` 记录产物（当阶段内所有产物都完成时标记阶段 completed）
-  - [ ] **D.7 ❌ 失败处理**：若 Agent 失败，先调用 `scripts/harness/check-stage.sh <feature> <N> --agents` 检查哪些 Agent 已完成，仅对失败的 Agent 调用 `scripts/harness/retry-agent.sh <feature> <N> <agent-name>` 重试；若 agent 重试上限已达，才用 `scripts/harness/retry-stage.sh <feature> <N>` 重试整个阶段；若阶段重试上限也达，暂停并报告
+  - [ ] **D.6 标记产物完成**：调用 `runtime/cli/update-stage.js <feature> <N> completed --artifact <name>` 记录产物（当阶段内所有产物都完成时标记阶段 completed）
+  - [ ] **D.7 ❌ 失败处理**：若 Agent 失败，先调用 `runtime/cli/check-stage.js <feature> <N> --agents` 检查哪些 Agent 已完成，仅对失败的 Agent 调用 `scripts/harness/retry-agent.sh <feature> <N> <agent-name>` 重试；若 agent 重试上限已达，才用 `scripts/harness/retry-stage.sh <feature> <N>` 重试整个阶段；若阶段重试上限也达，暂停并报告
   - [ ] **D.7a 🔄 反馈循环**：若 Agent 报告 `REVISION_NEEDED`（仅 Tech Lead / QA 可发起）：
     1. 调用 `scripts/harness/record-feedback.sh <feature> --from <critic-agent> --to <target-agent> --artifact <name> --reason "<原因>"` 记录反馈请求
     2. 若返回错误（轮次已达上限），暂停并报告用户
@@ -140,15 +140,15 @@ Copy this checklist and check off items as you complete them:
     - 阶段 1 完成后 → 确认规划结果 ⚠️ REQUIRED
     - 阶段 3 门禁后 → 可选确认
   - [ ] **D.9 🚦 门禁**（阶段 3 产物完成后）：
-    - 调用 `scripts/gates/gate-runner.sh <feature> gate0`（代码质量检查）
-    - 调用 `scripts/gates/gate-runner.sh <feature> gate1`（测试门禁）
-    - 调用 `scripts/gates/gate-runner.sh <feature> gate2`（性能门禁，仅 Web 项目）
+    - 调用 `runtime/cli/evaluate-gates.js <feature> gate0`（代码质量检查）
+    - 调用 `runtime/cli/evaluate-gates.js <feature> gate1`（测试门禁）
+    - 调用 `runtime/cli/evaluate-gates.js <feature> gate2`（性能门禁，仅 Web 项目）
     - 扫描 `harness/plugins/` 中 type=gate 的插件，依次执行
     - 门禁失败时修复后重新执行门禁
   - [ ] **D.10 回到 D.1**：重新查询就绪产物，直到 DAG 中所有非跳过产物都已完成
 
 - [ ] **收尾**
-  - [ ] F.1 📊 调用 `scripts/report/generate-summary.sh <feature>` 生成最终流水线报告（兼容入口，内部转调 `runtime/cli/generate-summary.js`）
+  - [ ] F.1 📊 调用 `runtime/cli/generate-summary.js <feature>` 生成最终流水线报告
   - [ ] F.2 输出最终结果（文档位置 + 测试摘要 + 门禁结果 + 访问 URL + 流水线耗时）
 
 ---
@@ -167,47 +167,42 @@ Copy this checklist and check off items as you complete them:
 | QA | `agents/boss-qa.md` | 测试执行、Bug 报告 |
 | DevOps | `agents/boss-devops.md` | 构建部署、健康检查 |
 
-## Harness 脚本
+## Runtime / Internal Helpers
 
-| 脚本 | 用途 |
+### Canonical Runtime Surface
+
+| 编排动作 | Runtime CLI | Runtime API |
+|---------|-------------|-------------|
+| 初始化流水线 | `runtime/cli/init-pipeline.js` | `initPipeline(feature)` |
+| 查询 ready artifacts | `runtime/cli/get-ready-artifacts.js` | `getReadyArtifacts(feature, options)` |
+| 阶段状态变更 | `runtime/cli/update-stage.js` | `updateStage(feature, stage, status, options)` |
+| 记录产物 | `runtime/cli/record-artifact.js` | `recordArtifact(feature, artifact, stage)` |
+| Agent 状态变更 | `runtime/cli/update-agent.js` | `updateAgent(feature, stage, agent, status, options)` |
+| 门禁评估 | `runtime/cli/evaluate-gates.js` | `evaluateGates(feature, gate, options)` |
+| 插件注册 | `runtime/cli/register-plugins.js` | `registerPlugins(feature, options)` |
+| 插件 Hook 执行 | `runtime/cli/run-plugin-hook.js` | `runHook(hook, feature, options)` |
+| 阶段状态检查 | `runtime/cli/check-stage.js` | `checkStage(feature, stage, options)` |
+| 事件回放 | `runtime/cli/replay-events.js` | `replayEvents(feature, options)`, `replaySnapshot(feature, at, options)` |
+| Progress 诊断 | `runtime/cli/inspect-progress.js` | `inspectProgress(feature, options)` |
+| 生成流水线报告 | `runtime/cli/generate-summary.js` | `buildSummaryModel(feature)`, `renderMarkdown(model)`, `renderJson(model)` |
+| 生成诊断页 | `runtime/cli/render-diagnostics.js` | `renderHtml(model)` |
+
+### Internal Shell Helpers
+
+| 辅助脚本 | 用途 |
 |------|------|
-| `scripts/harness/update-stage.sh` | 原子化更新阶段状态（状态机转换 + 产物记录 + gate 判定） |
-| `scripts/harness/check-stage.sh` | 兼容入口，转调 `runtime/cli/check-stage.js` 检查阶段状态、前置条件、重试可行性 |
 | `scripts/harness/retry-stage.sh` | 阶段重试（检查上限 → retrying → running） |
-| `scripts/harness/update-agent.sh` | Agent 级状态更新（running/completed/failed） |
 | `scripts/harness/retry-agent.sh` | 单个 Agent 重试（不重跑整个阶段） |
-| `scripts/harness/append-event.sh` | 追加事件到 events.jsonl（事件溯源） |
-| `scripts/harness/materialize-state.sh` | 从事件日志重建 execution.json |
-| `scripts/harness/replay-events.sh` | 兼容入口，转调 `runtime/cli/replay-events.js` 做事件回放与时间旅行调试 |
 | `scripts/harness/detect-pack.sh` | Pipeline Pack 自动检测（匹配项目文件） |
 | `scripts/harness/watch-progress.sh` | 实时进度监控（tail -f progress.jsonl） |
-| `scripts/harness/check-artifact.sh` | Artifact DAG 就绪检查（`--can-start`/`--ready`） |
 | `scripts/harness/record-feedback.sh` | Agent 间反馈循环记录（REVISION_NEEDED） |
-| `scripts/gates/gate-runner.sh` | Gate Engine 统一入口，执行指定门禁并追加事件后物化结果 |
 | `scripts/gates/gate0-code-quality.sh` | Gate 0：代码质量（编译 + Lint） |
 | `scripts/gates/gate1-testing.sh` | Gate 1：测试门禁（覆盖率 + 通过率 + E2E） |
 | `scripts/gates/gate2-performance.sh` | Gate 2：性能门禁（Lighthouse + API P99） |
-| `scripts/report/generate-summary.sh` | 兼容入口，转调 `runtime/cli/generate-summary.js` 生成流水线报告 |
-| `scripts/harness/load-plugins.sh` | 扫描并加载已注册的 Harness 插件 |
 
 ### Runtime/CLI 编排对照
 
-运行时编排以 `runtime/cli/*.js` + `runtime/cli/lib/pipeline-runtime.js` 为准；shell 入口主要用于兼容，不是逐项行为等价。
-
-| 编排动作 | Shell 入口（兼容层） | Runtime CLI | Runtime API |
-|---------|----------------------|-------------|-------------|
-| 初始化流水线 | `scripts/init-project.sh`（bootstrap：脚手架占位 + 调用 runtime init） | `runtime/cli/init-pipeline.js` | `initPipeline(feature)` |
-| 查询 ready artifacts | `scripts/harness/check-artifact.sh` | `runtime/cli/get-ready-artifacts.js` | `getReadyArtifacts(feature, options)` |
-| 阶段状态变更 | `scripts/harness/update-stage.sh` | `runtime/cli/update-stage.js` | `updateStage(feature, stage, status, options)` |
-| 记录产物 | 无直接稳定等价包装（`update-stage.sh --artifact` 为阶段更新附带记录） | `runtime/cli/record-artifact.js` | `recordArtifact(feature, artifact, stage)` |
-| Agent 状态变更 | `scripts/harness/update-agent.sh` | `runtime/cli/update-agent.js` | `updateAgent(feature, stage, agent, status, options)` |
-| 门禁评估 | `scripts/gates/gate-runner.sh` | `runtime/cli/evaluate-gates.js` | `evaluateGates(feature, gate, options)` |
-| 插件 Hook 执行 | `scripts/harness/load-plugins.sh --run-hook` | `runtime/cli/run-plugin-hook.js` | `runHook(hook, feature, options)` |
-| 阶段状态检查 | `scripts/harness/check-stage.sh` | `runtime/cli/check-stage.js` | `checkStage(feature, stage, options)` |
-| 事件回放 | `scripts/harness/replay-events.sh` | `runtime/cli/replay-events.js` | `replayEvents(feature, options)`, `replaySnapshot(feature, at, options)` |
-| Progress 诊断 | 无 | `runtime/cli/inspect-progress.js` | `inspectProgress(feature, options)` |
-| 生成流水线报告 | `scripts/report/generate-summary.sh` | `runtime/cli/generate-summary.js` | `buildSummaryModel(feature)`, `renderMarkdown(model)`, `renderJson(model)` |
-| 生成诊断页 | 无 | `runtime/cli/render-diagnostics.js` | `renderHtml(model)` |
+运行时编排以 `runtime/cli/*.js` + `runtime/cli/lib/pipeline-runtime.js` 为准；shell helper 不是 public contract。
 
 Pack 选择与插件生命周期都应进入事件流，而不是停留在 shell 日志里：
 - pack 应通过 `PackApplied` 进入 `execution.json` read model。
@@ -310,7 +305,7 @@ hooks 定义在两处：
 
 **并行调用**：需要同时执行多个 Agent 时（如阶段 1 的 Architect + UI Designer、阶段 3 的 Frontend + Backend），在同一步骤内同时发起多个子 Agent 调用，无需等待其中一个完成再启动另一个。
 
-**重试机制**：若子 Agent 执行失败，通过 Harness 的 `retry-stage.sh` 管理重试（自动检查重试次数上限，执行 failed → retrying → running 状态转换）；若已达上限，暂停并向用户报告失败原因及已完成的产物路径。
+**重试机制**：若子 Agent 执行失败，优先通过 runtime 状态检查后决定是调用内部 `retry-agent.sh` 还是 `retry-stage.sh`；shell helper 只负责执行重试，不承担对外编排语义。若已达上限，暂停并向用户报告失败原因及已完成的产物路径。
 
 **摘要优先**：读取上游产物时，优先读取文档开头的 `## 摘要` section；仅在需要细节时读取完整内容，以节省 Token。
 

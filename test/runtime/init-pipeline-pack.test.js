@@ -48,7 +48,7 @@ describe('initPipeline pack application', () => {
     assert.ok(events.some((event) => event.type === 'PackApplied'));
   });
 
-  it('applies and records pack truth for legacy execution-only initialization', () => {
+  it('rejects partial legacy execution-only state', () => {
     const metaDir = path.join(tmpDir, '.boss', 'test-feat', '.meta');
     fs.mkdirSync(metaDir, { recursive: true });
 
@@ -81,26 +81,13 @@ describe('initPipeline pack application', () => {
 
     fs.writeFileSync(path.join(metaDir, 'execution.json'), `${JSON.stringify(legacyState, null, 2)}\n`, 'utf8');
 
-    const state = runtime.initPipeline('test-feat', { cwd: tmpDir });
-    assert.equal(state.parameters.pipelinePack, 'api-only');
-
-    const rematerialized = materializeState('test-feat', tmpDir).state;
-    assert.equal(rematerialized.parameters.pipelinePack, 'api-only');
-
-    const eventsFile = path.join(metaDir, 'events.jsonl');
-    const events = fs
-      .readFileSync(eventsFile, 'utf8')
-      .trim()
-      .split('\n')
-      .filter(Boolean)
-      .map((line) => JSON.parse(line));
-
-    assert.equal(events[0].type, 'PipelineInitialized');
-    assert.equal(events[0].data.initialState.parameters.pipelinePack, 'api-only');
-    assert.ok(events.some((event) => event.type === 'PackApplied'));
+    assert.throws(
+      () => runtime.initPipeline('test-feat', { cwd: tmpDir }),
+      /检测到不完整的流水线状态/
+    );
   });
 
-  it('backfills pack truth once for legacy execution+events initialization', () => {
+  it('rejects already initialized pipelines instead of backfilling pack truth', () => {
     const metaDir = path.join(tmpDir, '.boss', 'test-feat', '.meta');
     fs.mkdirSync(metaDir, { recursive: true });
 
@@ -142,26 +129,13 @@ describe('initPipeline pack application', () => {
     };
     fs.writeFileSync(path.join(metaDir, 'events.jsonl'), `${JSON.stringify(initEvent)}\n`, 'utf8');
 
-    const state = runtime.initPipeline('test-feat', { cwd: tmpDir });
-    assert.equal(state.parameters.pipelinePack, 'api-only');
-
-    const stateAgain = runtime.initPipeline('test-feat', { cwd: tmpDir });
-    assert.equal(stateAgain.parameters.pipelinePack, 'api-only');
-
-    const rematerialized = materializeState('test-feat', tmpDir).state;
-    assert.equal(rematerialized.parameters.pipelinePack, 'api-only');
-
-    const events = fs
-      .readFileSync(path.join(metaDir, 'events.jsonl'), 'utf8')
-      .trim()
-      .split('\n')
-      .filter(Boolean)
-      .map((line) => JSON.parse(line));
-    const packAppliedEvents = events.filter((event) => event.type === 'PackApplied');
-    assert.equal(packAppliedEvents.length, 1);
+    assert.throws(
+      () => runtime.initPipeline('test-feat', { cwd: tmpDir }),
+      /流水线已存在/
+    );
   });
 
-  it('backfills default pack truth without appending PackApplied', () => {
+  it('rejects already initialized default-pack pipelines instead of backfilling truth', () => {
     const metaDir = path.join(tmpDir, '.boss', 'test-feat', '.meta');
     fs.mkdirSync(metaDir, { recursive: true });
     fs.rmSync(path.join(tmpDir, 'package.json'));
@@ -204,16 +178,9 @@ describe('initPipeline pack application', () => {
     };
     fs.writeFileSync(path.join(metaDir, 'events.jsonl'), `${JSON.stringify(initEvent)}\n`, 'utf8');
 
-    const state = runtime.initPipeline('test-feat', { cwd: tmpDir });
-    assert.equal(state.parameters.pipelinePack, 'default');
-
-    const events = fs
-      .readFileSync(path.join(metaDir, 'events.jsonl'), 'utf8')
-      .trim()
-      .split('\n')
-      .filter(Boolean)
-      .map((line) => JSON.parse(line));
-    const packAppliedEvents = events.filter((event) => event.type === 'PackApplied');
-    assert.equal(packAppliedEvents.length, 0);
+    assert.throws(
+      () => runtime.initPipeline('test-feat', { cwd: tmpDir }),
+      /流水线已存在/
+    );
   });
 });

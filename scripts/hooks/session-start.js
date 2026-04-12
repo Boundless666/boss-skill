@@ -40,33 +40,6 @@ function run(rawInput) {
     }
   }
 
-  let pluginCount = 0;
-  const pluginDir = path.join(process.env.SKILL_DIR || process.env.CLAUDE_PROJECT_DIR || '', 'harness', 'plugins');
-  if (!active && fs.existsSync(pluginDir)) {
-    try {
-      const pluginEntries = fs.readdirSync(pluginDir, { withFileTypes: true });
-      for (const entry of pluginEntries) {
-        if (!entry.isDirectory()) continue;
-        const pjPath = path.join(pluginDir, entry.name, 'plugin.json');
-        if (!fs.existsSync(pjPath)) continue;
-        try {
-          const pj = JSON.parse(fs.readFileSync(pjPath, 'utf8'));
-          const enabled = pj.enabled !== undefined ? pj.enabled : true;
-          if (enabled) pluginCount++;
-        } catch (err) {
-          process.stderr.write('[boss-skill] session-start/readPluginJson: ' + err.message + '\n');
-          continue;
-        }
-      }
-    } catch (err) {
-      process.stderr.write('[boss-skill] session-start/readdirPlugins: ' + err.message + '\n');
-    }
-  }
-
-  if (!active && pluginCount > 0) {
-    context += `\n[Boss Harness] ${pluginCount} plugin(s) registered`;
-  }
-
   const sessionStatePath = path.join(cwd, '.boss', '.session-state.json');
   let previousSession = null;
   if (fs.existsSync(sessionStatePath)) {

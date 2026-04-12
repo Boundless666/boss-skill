@@ -66,14 +66,14 @@ describe('evaluateGates', () => {
     assert.equal(execution.qualityGates['missing-gate'], undefined);
   });
 
-  it('returns non-zero exit for failing gate via gate-runner', () => {
+  it('returns non-zero exit for failing gate via runtime CLI', () => {
     const pluginDir = path.join(tmpDir, 'harness', 'plugins', 'fail-gate');
     fs.mkdirSync(pluginDir, { recursive: true });
     fs.writeFileSync(path.join(pluginDir, 'gate.sh'), '#!/bin/bash\necho "[]"\nexit 1\n', 'utf8');
     fs.chmodSync(path.join(pluginDir, 'gate.sh'), 0o755);
 
-    const gateRunner = path.join(__dirname, '..', '..', 'scripts', 'gates', 'gate-runner.sh');
-    const result = spawnSync('bash', [gateRunner, 'test-feat', 'fail-gate'], { cwd: tmpDir, encoding: 'utf8' });
+    const cli = path.join(__dirname, '..', '..', 'runtime', 'cli', 'evaluate-gates.js');
+    const result = spawnSync('node', [cli, 'test-feat', 'fail-gate'], { cwd: tmpDir, encoding: 'utf8' });
     assert.notEqual(result.status, 0);
   });
 
@@ -89,11 +89,11 @@ describe('evaluateGates', () => {
     assert.equal(result.execution.stages['3'].gateResults['stage-gate'], undefined);
   });
 
-  it('reports missing args at shell boundary for gate-runner', () => {
-    const gateRunner = path.join(__dirname, '..', '..', 'scripts', 'gates', 'gate-runner.sh');
-    const result = spawnSync('bash', [gateRunner], { cwd: tmpDir, encoding: 'utf8' });
+  it('reports missing args at runtime CLI boundary', () => {
+    const cli = path.join(__dirname, '..', '..', 'runtime', 'cli', 'evaluate-gates.js');
+    const result = spawnSync('node', [cli], { cwd: tmpDir, encoding: 'utf8' });
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /evaluate-gates\.js/);
+    assert.match(result.stderr, /evaluate-gates\.js|缺少 gate-name 参数/);
   });
 
   it('records stderr-only gate checks', () => {

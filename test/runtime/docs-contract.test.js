@@ -21,7 +21,7 @@ describe('runtime docs contract', () => {
     assert.doesNotMatch(contract, /evaluateGates[\s\S]*does not write state itself/i);
   });
 
-  it('documents the phase-2 runtime CLI and shell compatibility surface', () => {
+  it('documents the phase-2 runtime CLI surface', () => {
     const contract = read('docs/runtime-contract.md');
     const skill = read('SKILL.md');
     const readme = read('README.md');
@@ -37,17 +37,18 @@ describe('runtime docs contract', () => {
       assert.match(contract, new RegExp(command.replace('.', '\\.')));
     }
 
-    assert.match(skill, /查询 ready artifacts/);
-    assert.match(skill, /scripts\/harness\/check-artifact\.sh/);
     assert.match(skill, /runtime\/cli\/get-ready-artifacts\.js/);
+    assert.match(skill, /runtime\/cli\/update-stage\.js/);
+    assert.match(skill, /runtime\/cli\/update-agent\.js/);
 
-    assert.match(readme, /canonical surface/);
+    assert.match(readme, /runtime-first surface/);
     assert.match(readme, /runtime\/cli\/init-pipeline\.js/);
     assert.match(readme, /runtime\/cli\/get-ready-artifacts\.js/);
     assert.match(readme, /runtime\/cli\/record-artifact\.js/);
     assert.match(readme, /runtime\/cli\/update-stage\.js/);
     assert.match(readme, /runtime\/cli\/update-agent\.js/);
     assert.match(readme, /runtime\/cli\/evaluate-gates\.js/);
+    assert.doesNotMatch(readme, /Shell 兼容入口/);
   });
 
   it('documents pack and plugin hook runtime events as structured state truth', () => {

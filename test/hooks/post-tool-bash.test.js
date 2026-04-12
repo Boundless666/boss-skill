@@ -29,7 +29,7 @@ describe('post-tool-bash hook', () => {
 
   it('detects gate commands', () => {
     const result = hook.run(JSON.stringify({
-      tool_input: { command: 'bash scripts/gates/gate-runner.sh my-feat gate0' },
+      tool_input: { command: 'node runtime/cli/evaluate-gates.js my-feat gate0' },
       cwd: '/tmp'
     }));
     assert.ok(result.length > 0);
@@ -40,7 +40,7 @@ describe('post-tool-bash hook', () => {
 
   it('detects harness commands', () => {
     const result = hook.run(JSON.stringify({
-      tool_input: { command: 'bash scripts/harness/update-stage.sh my-feat 1 running' },
+      tool_input: { command: 'node runtime/cli/update-stage.js my-feat 1 running' },
       cwd: '/tmp'
     }));
     assert.ok(result.length > 0);

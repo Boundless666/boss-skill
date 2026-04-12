@@ -6,11 +6,11 @@ const { findActiveFeature } = require('../lib/boss-utils');
 const { emitProgress } = require('../lib/progress-emitter');
 
 function isGateCommand(command) {
-  return /gate-runner\.sh|gate0-|gate1-|gate2-/.test(command);
+  return /runtime\/cli\/evaluate-gates\.js|gate-runner\.sh|gate0-|gate1-|gate2-/.test(command);
 }
 
 function isHarnessCommand(command) {
-  return /update-stage\.sh|check-stage\.sh|retry-stage\.sh|generate-summary\.sh|load-plugins\.sh/.test(command);
+  return /runtime\/cli\/(update-stage|check-stage|replay-events|generate-summary|register-plugins|inspect-|run-plugin-hook)\.js|update-stage\.sh|check-stage\.sh|retry-stage\.sh|generate-summary\.sh|load-plugins\.sh/.test(command);
 }
 
 function isTestCommand(command) {

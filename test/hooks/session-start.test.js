@@ -56,33 +56,6 @@ describe('session-start hook', () => {
     assert.ok(parsed.hookSpecificOutput.additionalContext.includes('test-feat'));
   });
 
-  it('counts plugins when plugin dir exists', () => {
-    tmpDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'boss-test-'));
-    const pluginDir = path.join(tmpDir, 'harness', 'plugins', 'test-plugin');
-    fs.mkdirSync(pluginDir, { recursive: true });
-    fs.writeFileSync(
-      path.join(pluginDir, 'plugin.json'),
-      JSON.stringify({ name: 'test', enabled: true }),
-      'utf8'
-    );
-
-    const origEnv = process.env.SKILL_DIR;
-    process.env.SKILL_DIR = tmpDir;
-    try {
-      const result = hook.run(JSON.stringify({ cwd: tmpDir }));
-      if (result) {
-        const parsed = JSON.parse(result);
-        assert.ok(parsed.hookSpecificOutput.additionalContext.includes('plugin'));
-      }
-    } finally {
-      if (origEnv !== undefined) {
-        process.env.SKILL_DIR = origEnv;
-      } else {
-        delete process.env.SKILL_DIR;
-      }
-    }
-  });
-
   it('surfaces active plugin count from runtime execution state without scanning plugin dir', () => {
     const execData = createExecData({
       feature: 'test-feat',
