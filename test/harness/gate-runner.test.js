@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { execSync } = require('child_process');
+const { execSync, spawnSync } = require('child_process');
 
 const GATE_RUNNER_SCRIPT = path.join(__dirname, '..', '..', 'scripts', 'gates', 'gate-runner.sh');
 
@@ -104,5 +104,15 @@ describe('gate-runner', () => {
     assert.equal(parsed.gate, 'gate1');
     assert.equal(parsed.passed, true);
     assert.deepEqual(parsed.checks, events[1].data.checks);
+  });
+
+  it('exposes runtime-first help text from the wrapper boundary', () => {
+    const result = spawnSync('bash', [GATE_RUNNER_SCRIPT, '--help'], {
+      cwd: tmpDir,
+      encoding: 'utf8'
+    });
+
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /用法: evaluate-gates\.js <feature> <gate-name> \[options\]/);
   });
 });

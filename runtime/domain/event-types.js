@@ -17,6 +17,8 @@ const EVENT_TYPES = Object.freeze({
   REVISION_REQUESTED: 'RevisionRequested',
   PLUGIN_DISCOVERED: 'PluginDiscovered',
   PLUGIN_ACTIVATED: 'PluginActivated',
+  PLUGIN_HOOK_EXECUTED: 'PluginHookExecuted',
+  PLUGIN_HOOK_FAILED: 'PluginHookFailed',
   PLUGINS_REGISTERED: 'PluginsRegistered'
 });
 

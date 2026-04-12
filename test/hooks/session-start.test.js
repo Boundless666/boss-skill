@@ -82,4 +82,28 @@ describe('session-start hook', () => {
       }
     }
   });
+
+  it('surfaces active plugin count from runtime execution state without scanning plugin dir', () => {
+    const execData = createExecData({
+      feature: 'test-feat',
+      status: 'running',
+      plugins: [{ name: 'security-audit', version: '1.0.0', type: 'gate' }],
+      metrics: {
+        totalDuration: 60,
+        stageTimings: { '1': 30 },
+        gatePassRate: 100,
+        retryTotal: 0,
+        agentSuccessCount: 1,
+        agentFailureCount: 0,
+        meanRetriesPerStage: 0,
+        revisionLoopCount: 0,
+        pluginFailureCount: 0
+      }
+    });
+    tmpDir = createTempBossDir('test-feat', execData);
+
+    const result = hook.run(JSON.stringify({ cwd: tmpDir }));
+    const parsed = JSON.parse(result);
+    assert.match(parsed.hookSpecificOutput.additionalContext, /1 plugin\(s\) registered/);
+  });
 });

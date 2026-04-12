@@ -40,6 +40,8 @@ npm update -g @blade-ai/boss-skill && boss-skill
 
 或在 Claude Code 中使用 `/boss:upgrade` 命令。
 
+发布与迁移说明见 [CHANGELOG.md](./CHANGELOG.md)；runtime 行为契约见 [docs/runtime-contract.md](./docs/runtime-contract.md)。
+
 ## 工作原理
 
 ```
@@ -115,6 +117,43 @@ npm update -g @blade-ai/boss-skill && boss-skill
 ### Runtime / CLI 编排面（Canonical）
 
 `runtime/cli/*.js` 与 `runtime/cli/lib/pipeline-runtime.js` 是当前编排的 canonical surface。现有 shell 命令（如 `scripts/harness/update-stage.sh`、`scripts/harness/update-agent.sh`、`scripts/gates/gate-runner.sh`）保持稳定，作为 runtime/cli 的兼容包装层，不改变调用习惯。该兼容关系是部分能力对齐（兼容导向），不是逐项行为等价；`test/runtime/feature-flow.integration.test.js` 直接验证 canonical runtime CLI 编排链路。
+
+| 编排动作 | Shell 兼容入口 | Canonical runtime CLI |
+|------|------|------|
+| 初始化流水线 | `scripts/init-project.sh` | `runtime/cli/init-pipeline.js` |
+| 查询 ready artifacts | `scripts/harness/check-artifact.sh` | `runtime/cli/get-ready-artifacts.js` |
+| 记录产物完成 | 无稳定独立 shell 包装 | `runtime/cli/record-artifact.js` |
+| 更新阶段状态 | `scripts/harness/update-stage.sh` | `runtime/cli/update-stage.js` |
+| 更新 Agent 状态 | `scripts/harness/update-agent.sh` | `runtime/cli/update-agent.js` |
+| 执行门禁 | `scripts/gates/gate-runner.sh` | `runtime/cli/evaluate-gates.js` |
+| 执行插件 Hook | `scripts/harness/load-plugins.sh --run-hook` | `runtime/cli/run-plugin-hook.js` |
+| 检查阶段状态 | `scripts/harness/check-stage.sh` | `runtime/cli/check-stage.js` |
+| 回放事件/快照 | `scripts/harness/replay-events.sh` | `runtime/cli/replay-events.js` |
+| 诊断流水线状态 | 无 | `runtime/cli/inspect-pipeline.js` |
+| 查看最近事件 | 无 | `runtime/cli/inspect-events.js` |
+| 查看 progress 流 | 无 | `runtime/cli/inspect-progress.js` |
+| 查看插件生命周期 | 无 | `runtime/cli/inspect-plugins.js` |
+| 生成流水线报告 | `scripts/report/generate-summary.sh` | `runtime/cli/generate-summary.js` |
+| 生成诊断页 | 无 | `runtime/cli/render-diagnostics.js` |
+
+Pack 选择和插件生命周期现在都是 runtime 事件，不再只是 shell 侧副作用：
+- pack 选择通过 `PackApplied` 进入状态真相。
+- 插件发现/激活通过 `PluginDiscovered` / `PluginActivated` 进入事件流。
+- 插件 hook 执行通过 `PluginHookExecuted` / `PluginHookFailed` 进入事件流。
+
+四期排障 CLI 已开始补齐：
+- `runtime/cli/inspect-pipeline.js` 查看当前阶段、ready artifacts、active agents、pack、plugins、metrics。
+- `runtime/cli/inspect-events.js` 查看最近事件并支持按类型过滤。
+- `runtime/cli/inspect-progress.js` 查看 progress flow。
+- `runtime/cli/inspect-plugins.js` 查看 active/discovered/activated/executed/failed 插件状态。
+- `runtime/cli/check-stage.js` / `runtime/cli/replay-events.js` 取代旧 shell+jq 读状态方式。
+
+四期报告 runtime 已抽离为独立的 summary model + renderer：
+- `runtime/cli/generate-summary.js` 是 canonical summary surface，默认输出 Markdown，也支持 `--json` 和 `--stdout`。
+- `runtime/report/summary-model.js` 负责从 `execution.json` 构建统一 summary model。
+- `runtime/report/render-markdown.js` 负责渲染 `summary-report.md`。
+- `runtime/report/render-json.js` 负责渲染机器可读的 JSON 报告。
+- `runtime/report/render-html.js` + `runtime/cli/render-diagnostics.js` 负责生成最小 HTML 诊断页。
 
 ### 质量门禁
 
@@ -262,6 +301,28 @@ boss-skill/
 │       ├── core/
 │       ├── api-only/
 │       └── solana-contract/
+├── runtime/                          # Canonical runtime surface
+│   ├── cli/
+│   │   ├── init-pipeline.js
+│   │   ├── get-ready-artifacts.js
+│   │   ├── record-artifact.js
+│   │   ├── update-stage.js
+│   │   ├── update-agent.js
+│   │   ├── evaluate-gates.js
+│   │   ├── run-plugin-hook.js
+│   │   ├── check-stage.js
+│   │   ├── replay-events.js
+│   │   ├── inspect-pipeline.js
+│   │   ├── inspect-events.js
+│   │   ├── inspect-progress.js
+│   │   ├── inspect-plugins.js
+│   │   ├── generate-summary.js
+│   │   └── render-diagnostics.js
+│   └── report/
+│       ├── summary-model.js
+│       ├── render-markdown.js
+│       ├── render-json.js
+│       └── render-html.js
 ├── references/                       # 按需加载的规范文档
 │   ├── bmad-methodology.md
 │   ├── artifact-guide.md

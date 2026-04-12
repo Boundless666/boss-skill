@@ -7,7 +7,7 @@ show_help() {
     cat << 'EOF'
 Boss Gate Engine - 门禁统一入口
 
-用法: gate-runner.sh <feature> <gate-name> [options]
+用法: evaluate-gates.js <feature> <gate-name> [options]
 
 参数:
   feature     功能名称
@@ -24,9 +24,9 @@ Boss Gate Engine - 门禁统一入口
   4. 返回 exit code 0 (通过) 或 1 (未通过)
 
 示例:
-  gate-runner.sh my-feature gate0
-  gate-runner.sh my-feature gate1 --dry-run
-  gate-runner.sh my-feature security-audit --skip-on-error
+  evaluate-gates.js my-feature gate0
+  evaluate-gates.js my-feature gate1 --dry-run
+  evaluate-gates.js my-feature security-audit --skip-on-error
 EOF
 }
 

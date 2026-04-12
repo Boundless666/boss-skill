@@ -35,6 +35,7 @@ describe('progress-emitter', () => {
 
     const event = JSON.parse(lines[0]);
     assert.equal(event.type, 'stage-start');
+    assert.equal(event.feature, 'test-feat');
     assert.equal(event.data.stage, 1);
     assert.ok(event.timestamp);
   });

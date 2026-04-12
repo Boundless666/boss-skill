@@ -61,4 +61,52 @@ describe('session-end hook', () => {
     const sessionStatePath = path.join(tmpDir, '.boss', '.session-state.json');
     assert.ok(!fs.existsSync(sessionStatePath));
   });
+
+  it('generates summary report through runtime modules even without SKILL_DIR', () => {
+    const execData = createExecData({
+      feature: 'test-feat',
+      status: 'running',
+      schemaVersion: '0.2.0',
+      createdAt: '2026-04-12T00:00:00Z',
+      updatedAt: '2026-04-12T00:01:00Z',
+      parameters: { pipelinePack: 'default' },
+      qualityGates: {
+        gate0: { status: 'pending', passed: null, checks: [], executedAt: null },
+        gate1: { status: 'pending', passed: null, checks: [], executedAt: null },
+        gate2: { status: 'pending', passed: null, checks: [], executedAt: null }
+      },
+      metrics: {
+        totalDuration: 60,
+        stageTimings: { '1': 30 },
+        gatePassRate: null,
+        retryTotal: 0,
+        agentSuccessCount: 0,
+        agentFailureCount: 0,
+        meanRetriesPerStage: 0,
+        revisionLoopCount: 0,
+        pluginFailureCount: 0
+      },
+      plugins: [],
+      pluginLifecycle: { discovered: [], activated: [], executed: [], failed: [] },
+      humanInterventions: [],
+      revisionRequests: [],
+      feedbackLoops: { maxRounds: 2, currentRound: 0 }
+    });
+    tmpDir = createTempBossDir('test-feat', execData);
+
+    const origSkill = process.env.SKILL_DIR;
+    const origClaude = process.env.CLAUDE_PROJECT_DIR;
+    delete process.env.SKILL_DIR;
+    delete process.env.CLAUDE_PROJECT_DIR;
+    try {
+      hook.run(JSON.stringify({ cwd: tmpDir }));
+    } finally {
+      if (origSkill !== undefined) process.env.SKILL_DIR = origSkill;
+      if (origClaude !== undefined) process.env.CLAUDE_PROJECT_DIR = origClaude;
+    }
+
+    const summaryPath = path.join(tmpDir, '.boss', 'test-feat', 'summary-report.md');
+    assert.ok(fs.existsSync(summaryPath));
+    assert.match(fs.readFileSync(summaryPath, 'utf8'), /# 流水线执行报告/);
+  });
 });

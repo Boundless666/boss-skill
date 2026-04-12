@@ -37,6 +37,7 @@
     "agents/",
     "commands/",
     "harness/",
+    "runtime/",
     "references/",
     "scripts/",
     "templates/",

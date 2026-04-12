@@ -87,4 +87,25 @@ describe('stage/agent runtime updates', () => {
     assert.notEqual(agentResult.status, 0);
     assert.match(agentResult.stderr, /--reason/);
   });
+
+  it('supports machine-readable JSON output for stage and agent updates', () => {
+    const updateStageCli = path.join(__dirname, '..', '..', 'runtime', 'cli', 'update-stage.js');
+    const updateAgentCli = path.join(__dirname, '..', '..', 'runtime', 'cli', 'update-agent.js');
+
+    const stageResult = runCli(updateStageCli, ['test-feat', '1', 'running', '--json']);
+    assert.equal(stageResult.status, 0, stageResult.stderr);
+    const stagePayload = JSON.parse(stageResult.stdout);
+    assert.equal(stagePayload.feature, 'test-feat');
+    assert.equal(stagePayload.stage, 1);
+    assert.equal(stagePayload.previousStatus, 'pending');
+    assert.equal(stagePayload.status, 'running');
+
+    const agentResult = runCli(updateAgentCli, ['test-feat', '1', 'boss-pm', 'running', '--json']);
+    assert.equal(agentResult.status, 0, agentResult.stderr);
+    const agentPayload = JSON.parse(agentResult.stdout);
+    assert.equal(agentPayload.feature, 'test-feat');
+    assert.equal(agentPayload.stage, 1);
+    assert.equal(agentPayload.agent, 'boss-pm');
+    assert.equal(agentPayload.status, 'running');
+  });
 });

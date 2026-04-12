@@ -2,8 +2,9 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
 const { writeJson } = require('../lib/boss-utils');
+const { buildSummaryModel } = require('../../runtime/report/summary-model');
+const { renderMarkdown } = require('../../runtime/report/render-markdown');
 
 function run(rawInput) {
   const input = JSON.parse(rawInput);
@@ -19,13 +20,6 @@ function run(rawInput) {
     process.stderr.write('[boss-skill] session-end/readdirSync: ' + err.message + '\n');
     return '';
   }
-
-  const reportScript = path.join(
-    process.env.SKILL_DIR || process.env.CLAUDE_PROJECT_DIR || '',
-    'scripts',
-    'report',
-    'generate-summary.sh'
-  );
 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
@@ -70,12 +64,9 @@ function run(rawInput) {
       }
 
       try {
-        if (fs.existsSync(reportScript)) {
-          execSync(`bash "${reportScript}" "${feature}"`, {
-            stdio: 'ignore',
-            timeout: 10000
-          });
-        }
+        const reportPath = path.join(cwd, '.boss', feature, 'summary-report.md');
+        const model = buildSummaryModel(feature, { cwd });
+        fs.writeFileSync(reportPath, renderMarkdown(model), 'utf8');
       } catch (err) {
         process.stderr.write('[boss-skill] session-end/generateReport: ' + err.message + '\n');
       }

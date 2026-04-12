@@ -67,12 +67,27 @@
     },
     "metrics": {
       "type": "object",
-      "required": ["totalDuration", "stageTimings", "gatePassRate", "retryTotal"],
+      "required": [
+        "totalDuration",
+        "stageTimings",
+        "gatePassRate",
+        "retryTotal",
+        "agentSuccessCount",
+        "agentFailureCount",
+        "meanRetriesPerStage",
+        "revisionLoopCount",
+        "pluginFailureCount"
+      ],
       "properties": {
         "totalDuration": { "type": ["number", "null"] },
         "stageTimings": { "type": "object" },
         "gatePassRate": { "type": ["number", "null"] },
-        "retryTotal": { "type": "integer", "minimum": 0 }
+        "retryTotal": { "type": "integer", "minimum": 0 },
+        "agentSuccessCount": { "type": "integer", "minimum": 0 },
+        "agentFailureCount": { "type": "integer", "minimum": 0 },
+        "meanRetriesPerStage": { "type": "number", "minimum": 0 },
+        "revisionLoopCount": { "type": "integer", "minimum": 0 },
+        "pluginFailureCount": { "type": "integer", "minimum": 0 }
       }
     },
     "plugins": {
@@ -94,10 +109,38 @@
     },
     "pluginLifecycle": {
       "type": "object",
-      "required": ["discovered", "activated"],
+      "required": ["discovered", "activated", "executed", "failed"],
       "properties": {
         "discovered": { "$ref": "#/properties/plugins" },
-        "activated": { "$ref": "#/properties/plugins" }
+        "activated": { "$ref": "#/properties/plugins" },
+        "executed": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["plugin", "hook", "exitCode", "timestamp"],
+            "properties": {
+              "plugin": { "$ref": "#/properties/plugins/items" },
+              "hook": { "type": "string" },
+              "stage": { "type": ["integer", "null"] },
+              "exitCode": { "type": "integer", "minimum": 0 },
+              "timestamp": { "type": "string" }
+            }
+          }
+        },
+        "failed": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["plugin", "hook", "exitCode", "timestamp"],
+            "properties": {
+              "plugin": { "$ref": "#/properties/plugins/items" },
+              "hook": { "type": "string" },
+              "stage": { "type": ["integer", "null"] },
+              "exitCode": { "type": "integer", "minimum": 0 },
+              "timestamp": { "type": "string" }
+            }
+          }
+        }
       }
     },
     "humanInterventions": { "type": "array" },

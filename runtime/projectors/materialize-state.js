@@ -89,12 +89,19 @@ function defaultExecutionState(feature = '') {
       totalDuration: null,
       stageTimings: {},
       gatePassRate: null,
-      retryTotal: 0
+      retryTotal: 0,
+      agentSuccessCount: 0,
+      agentFailureCount: 0,
+      meanRetriesPerStage: 0,
+      revisionLoopCount: 0,
+      pluginFailureCount: 0
     },
     plugins: [],
     pluginLifecycle: {
       discovered: [],
-      activated: []
+      activated: [],
+      executed: [],
+      failed: []
     },
     humanInterventions: [],
     revisionRequests: [],
@@ -302,6 +309,19 @@ function validateEvent(event) {
     case EVENT_TYPES.PLUGIN_ACTIVATED:
       validatePluginSummary(event.data.plugin, `${context}.plugin`);
       break;
+    case EVENT_TYPES.PLUGIN_HOOK_EXECUTED:
+    case EVENT_TYPES.PLUGIN_HOOK_FAILED:
+      validatePluginSummary(event.data.plugin, `${context}.plugin`);
+      if (!isNonEmptyString(event.data.hook)) {
+        failValidation('hook 必须是非空字符串', context);
+      }
+      if (!Number.isInteger(event.data.exitCode) || event.data.exitCode < 0) {
+        failValidation('exitCode 必须是大于等于 0 的整数', context);
+      }
+      if (event.data.stage !== undefined && event.data.stage !== null && !isPositiveInteger(event.data.stage)) {
+        failValidation('stage 必须是正整数或 null', context);
+      }
+      break;
     case EVENT_TYPES.PLUGINS_REGISTERED:
       if (!Array.isArray(event.data.plugins)) {
         failValidation('plugins 必须是数组', context);
@@ -337,6 +357,21 @@ function validateExecutionState(state, feature) {
   if (!isObject(state.metrics)) {
     failValidation('execution.metrics 必须是对象');
   }
+  for (const key of [
+    'totalDuration',
+    'stageTimings',
+    'gatePassRate',
+    'retryTotal',
+    'agentSuccessCount',
+    'agentFailureCount',
+    'meanRetriesPerStage',
+    'revisionLoopCount',
+    'pluginFailureCount'
+  ]) {
+    if (!(key in state.metrics)) {
+      failValidation(`execution.metrics.${key} 缺失`);
+    }
+  }
   if (!Array.isArray(state.plugins)) {
     failValidation('execution.plugins 必须是数组');
   }
@@ -348,6 +383,12 @@ function validateExecutionState(state, feature) {
   }
   if (!Array.isArray(state.pluginLifecycle.activated)) {
     failValidation('execution.pluginLifecycle.activated 必须是数组');
+  }
+  if (!Array.isArray(state.pluginLifecycle.executed)) {
+    failValidation('execution.pluginLifecycle.executed 必须是数组');
+  }
+  if (!Array.isArray(state.pluginLifecycle.failed)) {
+    failValidation('execution.pluginLifecycle.failed 必须是数组');
   }
 }
 
@@ -499,7 +540,7 @@ function applyEvent(currentState, event, feature) {
 
     case EVENT_TYPES.PLUGIN_DISCOVERED: {
       if (!state.pluginLifecycle || typeof state.pluginLifecycle !== 'object') {
-        state.pluginLifecycle = { discovered: [], activated: [] };
+        state.pluginLifecycle = { discovered: [], activated: [], executed: [], failed: [] };
       }
       state.pluginLifecycle.discovered = normalizePlugins(
         (state.pluginLifecycle.discovered || []).concat(event.data.plugin || {})
@@ -509,12 +550,40 @@ function applyEvent(currentState, event, feature) {
 
     case EVENT_TYPES.PLUGIN_ACTIVATED: {
       if (!state.pluginLifecycle || typeof state.pluginLifecycle !== 'object') {
-        state.pluginLifecycle = { discovered: [], activated: [] };
+        state.pluginLifecycle = { discovered: [], activated: [], executed: [], failed: [] };
       }
       state.pluginLifecycle.activated = normalizePlugins(
         (state.pluginLifecycle.activated || []).concat(event.data.plugin || {})
       );
       state.plugins = normalizePlugins((state.plugins || []).concat(event.data.plugin || {}));
+      return state;
+    }
+
+    case EVENT_TYPES.PLUGIN_HOOK_EXECUTED: {
+      if (!state.pluginLifecycle || typeof state.pluginLifecycle !== 'object') {
+        state.pluginLifecycle = { discovered: [], activated: [], executed: [], failed: [] };
+      }
+      state.pluginLifecycle.executed = (state.pluginLifecycle.executed || []).concat({
+        plugin: clone(event.data.plugin || {}),
+        hook: event.data.hook,
+        stage: event.data.stage == null ? null : event.data.stage,
+        exitCode: event.data.exitCode,
+        timestamp: event.timestamp
+      });
+      return state;
+    }
+
+    case EVENT_TYPES.PLUGIN_HOOK_FAILED: {
+      if (!state.pluginLifecycle || typeof state.pluginLifecycle !== 'object') {
+        state.pluginLifecycle = { discovered: [], activated: [], executed: [], failed: [] };
+      }
+      state.pluginLifecycle.failed = (state.pluginLifecycle.failed || []).concat({
+        plugin: clone(event.data.plugin || {}),
+        hook: event.data.hook,
+        stage: event.data.stage == null ? null : event.data.stage,
+        exitCode: event.data.exitCode,
+        timestamp: event.timestamp
+      });
       return state;
     }
 
@@ -540,21 +609,46 @@ function computeDurationSeconds(start, end) {
 
 function finalizeState(state) {
   const stageTimings = {};
+  let stageRetryCount = 0;
+  let stageCount = 0;
+  let agentSuccessCount = 0;
+  let agentFailureCount = 0;
   for (const [stageId, stage] of Object.entries(state.stages || {})) {
     const duration = computeDurationSeconds(stage.startTime, stage.endTime);
     if (duration != null) {
       stageTimings[stageId] = duration;
     }
+    stageRetryCount += Number(stage.retryCount || 0);
+    stageCount += 1;
     if (Array.isArray(stage.artifacts)) {
       stage.artifacts = uniqueArtifacts(stage.artifacts);
     } else {
       stage.artifacts = [];
     }
     stage.gateResults = isObject(stage.gateResults) ? stage.gateResults : {};
+    const agents = isObject(stage.agents) ? stage.agents : {};
+    for (const agentState of Object.values(agents)) {
+      if (!agentState || typeof agentState !== 'object') continue;
+      if (agentState.status === AGENT_STATUS.COMPLETED) {
+        agentSuccessCount += 1;
+      } else if (agentState.status === AGENT_STATUS.FAILED) {
+        agentFailureCount += 1;
+      }
+    }
   }
 
   state.metrics.stageTimings = stageTimings;
   state.metrics.totalDuration = computeDurationSeconds(state.createdAt, state.updatedAt);
+  state.metrics.agentSuccessCount = agentSuccessCount;
+  state.metrics.agentFailureCount = agentFailureCount;
+  state.metrics.meanRetriesPerStage = stageCount > 0
+    ? Number((stageRetryCount / stageCount).toFixed(2))
+    : 0;
+  state.metrics.revisionLoopCount = Number(
+    (state.feedbackLoops && Number.isFinite(Number(state.feedbackLoops.currentRound)))
+      ? state.feedbackLoops.currentRound
+      : 0
+  );
 
   const completedGates = Object.values(state.qualityGates || {}).filter(gate => gate.status === STAGE_STATUS.COMPLETED);
   if (completedGates.length > 0) {
@@ -573,10 +667,17 @@ function finalizeState(state) {
 
   state.plugins = normalizePlugins(state.plugins);
   if (!state.pluginLifecycle || typeof state.pluginLifecycle !== 'object') {
-    state.pluginLifecycle = { discovered: [], activated: [] };
+    state.pluginLifecycle = { discovered: [], activated: [], executed: [], failed: [] };
   }
   state.pluginLifecycle.discovered = normalizePlugins(state.pluginLifecycle.discovered);
   state.pluginLifecycle.activated = normalizePlugins(state.pluginLifecycle.activated);
+  state.pluginLifecycle.executed = Array.isArray(state.pluginLifecycle.executed)
+    ? state.pluginLifecycle.executed
+    : [];
+  state.pluginLifecycle.failed = Array.isArray(state.pluginLifecycle.failed)
+    ? state.pluginLifecycle.failed
+    : [];
+  state.metrics.pluginFailureCount = state.pluginLifecycle.failed.length;
   return state;
 }
 
@@ -612,13 +713,7 @@ function materializeState(feature, cwd = process.cwd()) {
   }
 
   const events = readEvents(eventsFile);
-  let state = defaultExecutionState(feature);
-
-  for (const event of events) {
-    state = applyEvent(state, event, feature);
-  }
-
-  state = finalizeState(state);
+  const state = projectState(events, feature);
   validateExecutionState(state, feature);
   fs.writeFileSync(execJsonPath, JSON.stringify(state, null, 2) + '\n', 'utf8');
 
@@ -627,6 +722,14 @@ function materializeState(feature, cwd = process.cwd()) {
     execJsonPath,
     state
   };
+}
+
+function projectState(events, feature) {
+  let state = defaultExecutionState(feature);
+  for (const event of events) {
+    state = applyEvent(state, event, feature);
+  }
+  return finalizeState(state);
 }
 
 function runCli(argv = process.argv.slice(2)) {
@@ -653,5 +756,7 @@ module.exports = {
   materializeState,
   defaultExecutionState,
   finalizeState,
-  applyEvent
+  applyEvent,
+  projectState,
+  readEvents
 };

@@ -39,5 +39,6 @@ describe('subagent-start hook', () => {
     const parsed = JSON.parse(result);
     assert.ok(parsed.hookSpecificOutput.additionalContext.includes('test-feat'));
     assert.ok(parsed.hookSpecificOutput.additionalContext.includes('code'));
+    assert.ok(parsed.hookSpecificOutput.additionalContext.includes('BOSS_STATUS'));
   });
 });

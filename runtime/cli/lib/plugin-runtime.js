@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { spawnSync } = require('child_process');
 const { materializeState } = require('../../projectors/materialize-state');
 const { EVENT_TYPES } = require('../../domain/event-types');
 
@@ -294,6 +295,25 @@ function summarizePlugin(plugin) {
   return summary;
 }
 
+function parseStage(stage) {
+  if (stage === undefined || stage === null || stage === '') {
+    return null;
+  }
+  const parsed = Number(stage);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error('stage 必须是正整数');
+  }
+  return parsed;
+}
+
+function resolveHookScriptPath(pluginRoot, plugin, hook) {
+  const hookPath = plugin && plugin.hooks ? plugin.hooks[hook] : '';
+  if (typeof hookPath !== 'string' || hookPath.length === 0) {
+    return '';
+  }
+  return path.join(pluginRoot, path.dirname(plugin.manifestPath || ''), hookPath);
+}
+
 function mergePluginSets(existing, incoming) {
   const merged = [];
   const byName = new Map();
@@ -366,10 +386,77 @@ function registerPlugins(feature, { cwd = process.cwd(), repoRoot = REPO_ROOT, t
   };
 }
 
+function runHook(hook, feature, { cwd = process.cwd(), repoRoot = REPO_ROOT, stage } = {}) {
+  if (!hook) throw new Error('缺少 hook 参数');
+  const eventsFile = ensureFeatureMeta(cwd, feature);
+  const pluginRoot = resolvePluginRoot({ cwd, repoRoot });
+  const stageNumber = parseStage(stage);
+  const discovery = discoverPlugins({ cwd, repoRoot, strict: true });
+  const now = new Date().toISOString();
+  const results = [];
+
+  for (const plugin of discovery.plugins) {
+    const fullPath = resolveHookScriptPath(pluginRoot, plugin, hook);
+    if (!fullPath) continue;
+    if (stageNumber != null && Array.isArray(plugin.stages) && plugin.stages.length > 0 && !plugin.stages.includes(stageNumber)) {
+      continue;
+    }
+
+    const args = [fullPath, feature];
+    if (stageNumber != null) {
+      args.push(String(stageNumber));
+    }
+
+    const execution = spawnSync('bash', args, {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    if (execution.error) {
+      throw execution.error;
+    }
+
+    const summary = summarizePlugin(plugin);
+    const exitCode = Number.isInteger(execution.status) && execution.status >= 0 ? execution.status : 1;
+    const passed = exitCode === 0;
+
+    appendEvent(eventsFile, {
+      type: passed ? EVENT_TYPES.PLUGIN_HOOK_EXECUTED : EVENT_TYPES.PLUGIN_HOOK_FAILED,
+      timestamp: now,
+      data: {
+        plugin: summary,
+        hook,
+        stage: stageNumber == null ? undefined : stageNumber,
+        exitCode
+      }
+    });
+
+    results.push({
+      plugin: summary,
+      hook,
+      stage: stageNumber,
+      exitCode,
+      passed,
+      stdout: execution.stdout || '',
+      stderr: execution.stderr || ''
+    });
+  }
+
+  const { state } = materializeState(feature, cwd);
+  return {
+    hook,
+    feature,
+    stage: stageNumber,
+    results,
+    execution: state
+  };
+}
+
 module.exports = {
   discoverPlugins,
   validatePlugins,
   registerPlugins,
+  runHook,
   validatePluginManifest,
   sortPluginsByDependencies,
   resolvePluginRoot

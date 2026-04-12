@@ -41,6 +41,18 @@ describe('getReadyArtifacts', () => {
     );
   });
 
+  it('exposes artifact status through the public runtime API', () => {
+    runtime.initPipeline('test-feat', { cwd: tmpDir });
+
+    const blocked = runtime.getArtifactStatus('test-feat', 'architecture.md', { cwd: tmpDir });
+    assert.equal(blocked.status, 'blocked');
+    assert.deepEqual(blocked.missing, ['prd.md']);
+
+    runtime.recordArtifact('test-feat', 'prd.md', 1, { cwd: tmpDir });
+    const ready = runtime.getArtifactStatus('test-feat', 'architecture.md', { cwd: tmpDir });
+    assert.equal(ready.status, 'ready');
+  });
+
   it('rejects --dag without a value in the CLI wrapper', () => {
     const { execSync } = require('child_process');
     const cliPath = path.join(__dirname, '..', '..', 'runtime', 'cli', 'get-ready-artifacts.js');

@@ -27,11 +27,13 @@ npm test
 | 目录 | 职责 |
 |------|------|
 | `agents/` | 9 个 Agent 的 Prompt 定义（Markdown） |
+| `runtime/` | Canonical runtime CLI、inspection、report、projector、schema |
 | `scripts/lib/` | 共享库（`common.sh` Shell 工具、`boss-utils.js` Node.js 工具） |
 | `scripts/hooks/` | 10 个 Claude Code Hook 脚本 |
 | `scripts/harness/` | 流水线阶段管理 Shell 脚本 |
 | `scripts/gates/` | 质量门禁脚本 |
 | `harness/` | 插件系统和 Pipeline Pack 配置 |
+| `docs/` | runtime contract、实施计划等设计/迁移文档 |
 | `templates/` | 产物模板 |
 | `test/` | 自动化测试 |
 | `bin/boss-skill.js` | CLI 入口 |
@@ -81,6 +83,12 @@ try {
 本项目不使用任何第三方 npm 依赖。所有代码仅使用 Node.js 内置模块（`fs`、`path`、`os`、`child_process`）。
 
 新增功能时请遵守此约束，包括测试框架（使用 `node:test` + `node:assert`）。
+
+### Runtime 优先原则
+
+- 需要新增或修改编排行为时，优先改 `runtime/cli/*`、`runtime/cli/lib/*`、`runtime/projectors/*`、`runtime/report/*`。
+- `scripts/harness/*.sh`、`scripts/gates/*.sh`、`scripts/report/*.sh` 默认应作为兼容 wrapper，而不是新的 canonical 业务逻辑承载层。
+- 不要直接写 `execution.json`；状态变更必须先进入事件流，再由 projector 物化。
 
 ## 测试
 

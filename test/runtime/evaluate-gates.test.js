@@ -93,7 +93,7 @@ describe('evaluateGates', () => {
     const gateRunner = path.join(__dirname, '..', '..', 'scripts', 'gates', 'gate-runner.sh');
     const result = spawnSync('bash', [gateRunner], { cwd: tmpDir, encoding: 'utf8' });
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /gate-runner\.sh/);
+    assert.match(result.stderr, /evaluate-gates\.js/);
   });
 
   it('records stderr-only gate checks', () => {

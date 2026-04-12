@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { execSync } = require('child_process');
+const { execSync, spawnSync } = require('child_process');
 
 const UPDATE_AGENT_SCRIPT = path.join(__dirname, '..', '..', 'scripts', 'harness', 'update-agent.sh');
 const RETRY_AGENT_SCRIPT = path.join(__dirname, '..', '..', 'scripts', 'harness', 'retry-agent.sh');
@@ -151,6 +151,26 @@ describe('agent-level-retry', () => {
     assert.throws(() => {
       runScript(UPDATE_AGENT_SCRIPT, 'test-feat 1 boss-pm invalid-status');
     });
+  });
+
+  it('update-agent.sh supports machine-readable JSON output', () => {
+    const output = runScript(UPDATE_AGENT_SCRIPT, 'test-feat 1 boss-pm running --json');
+    const payload = JSON.parse(output);
+
+    assert.equal(payload.feature, 'test-feat');
+    assert.equal(payload.stage, 1);
+    assert.equal(payload.agent, 'boss-pm');
+    assert.equal(payload.status, 'running');
+  });
+
+  it('update-agent.sh exposes runtime-first help text', () => {
+    const result = spawnSync('bash', [UPDATE_AGENT_SCRIPT, '--help'], {
+      cwd: tmpDir,
+      encoding: 'utf8'
+    });
+
+    assert.equal(result.status, 0);
+    assert.match(result.stderr, /用法: update-agent\.js <feature> <stage> <agent-name> <status> \[options\]/);
   });
 
   it('events are correctly appended for agent transitions', () => {

@@ -52,4 +52,42 @@ describe('subagent-stop hook', () => {
     const logFile = path.join(tmpDir, '.boss', '.harness-logs', '.meta', 'agent-log.jsonl');
     assert.ok(fs.existsSync(logFile));
   });
+
+  it('prefers structured boss status blocks over regex fallback', () => {
+    const execData = createExecData({
+      feature: 'test-feat',
+      status: 'running',
+      stages: {
+        '1': { name: 'Planning', status: 'completed', artifacts: [] },
+        '2': { name: 'Review', status: 'running', artifacts: [] },
+        '3': { name: 'Development', status: 'pending', artifacts: [] },
+        '4': { name: 'Deployment', status: 'pending', artifacts: [] }
+      }
+    });
+    tmpDir = createTempBossDir('test-feat', execData);
+
+    hook.run(JSON.stringify({
+      cwd: tmpDir,
+      agent_type: 'boss-tech-lead',
+      agent_id: 'agent-789',
+      last_assistant_message: [
+        'DONE',
+        '[BOSS_STATUS]',
+        'status: BLOCKED',
+        'reason: waiting-for-schema',
+        '[/BOSS_STATUS]'
+      ].join('\n')
+    }));
+
+    const execJson = JSON.parse(
+      fs.readFileSync(path.join(tmpDir, '.boss', 'test-feat', '.meta', 'execution.json'), 'utf8')
+    );
+    assert.equal(execJson.stages['2'].agents['boss-tech-lead'].status, 'failed');
+    assert.equal(execJson.stages['2'].agents['boss-tech-lead'].failureReason, 'waiting-for-schema');
+
+    const logFile = path.join(tmpDir, '.boss', 'test-feat', '.meta', 'agent-log.jsonl');
+    const entry = JSON.parse(fs.readFileSync(logFile, 'utf8').trim());
+    assert.equal(entry.status, 'BLOCKED');
+    assert.equal(entry.reason, 'waiting-for-schema');
+  });
 });

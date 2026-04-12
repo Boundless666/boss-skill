@@ -45,7 +45,57 @@ describe('runtime schema contract', () => {
     );
     assert.deepEqual(
       schema.properties.pluginLifecycle.required.slice().sort(),
-      ['activated', 'discovered']
+      ['activated', 'discovered', 'executed', 'failed']
+    );
+  });
+
+  it('execution schema requires expanded phase-4 metrics fields', () => {
+    const schema = loadJson('runtime/schema/execution-schema.json');
+
+    assert.deepEqual(
+      schema.properties.metrics.required.slice().sort(),
+      [
+        'agentFailureCount',
+        'agentSuccessCount',
+        'gatePassRate',
+        'meanRetriesPerStage',
+        'pluginFailureCount',
+        'retryTotal',
+        'revisionLoopCount',
+        'stageTimings',
+        'totalDuration'
+      ]
+    );
+  });
+
+  it('progress schema requires feature on emitted progress events', () => {
+    const schema = loadJson('runtime/schema/progress-schema.json');
+
+    assert.ok(Array.isArray(schema.required));
+    assert.ok(schema.required.includes('feature'));
+  });
+
+  it('event schema documents plugin hook lifecycle payload requirements', () => {
+    const schema = loadJson('runtime/schema/event-schema.json');
+    const clauses = Array.isArray(schema.allOf) ? schema.allOf : [];
+
+    const executedClause = clauses.find((clause) =>
+      clause?.if?.properties?.type?.const === 'PluginHookExecuted'
+    );
+    const failedClause = clauses.find((clause) =>
+      clause?.if?.properties?.type?.const === 'PluginHookFailed'
+    );
+
+    assert.ok(executedClause, 'PluginHookExecuted conditional schema missing');
+    assert.deepEqual(
+      executedClause.then.properties.data.required.slice().sort(),
+      ['exitCode', 'hook', 'plugin']
+    );
+
+    assert.ok(failedClause, 'PluginHookFailed conditional schema missing');
+    assert.deepEqual(
+      failedClause.then.properties.data.required.slice().sort(),
+      ['exitCode', 'hook', 'plugin']
     );
   });
 });

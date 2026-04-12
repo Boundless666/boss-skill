@@ -54,6 +54,11 @@ function run(rawInput) {
     context += `, 活跃阶段: ${currentStage} (${stageName})`;
   }
   context += `\n子 Agent 类型: ${agentType}`;
+  context += '\n请在最终消息中附带固定状态块：';
+  context += '\n[BOSS_STATUS]';
+  context += '\nstatus: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED';
+  context += '\nreason: <optional>';
+  context += '\n[/BOSS_STATUS]';
 
   return JSON.stringify({
     hookSpecificOutput: {

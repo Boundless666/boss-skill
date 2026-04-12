@@ -123,36 +123,8 @@ case "$ACTION" in
     run-hook)
         [[ -z "$HOOK_NAME" ]] && error "缺少 hook 名称"
         [[ -z "$FEATURE" ]] && error "缺少 feature 参数"
-
-        info "执行 hook: $HOOK_NAME (feature=$FEATURE, stage=$STAGE)"
-
-        for pj in $(find_plugins ""); do
-            name=$(jq -r '.name' "$pj")
-            hook_script=$(jq -r ".hooks[\"$HOOK_NAME\"] // empty" "$pj")
-
-            if [[ -z "$hook_script" ]]; then
-                continue
-            fi
-
-            if [[ -n "$STAGE" ]]; then
-                PLUGIN_STAGES=$(jq -r '.stages // [] | .[]' "$pj")
-                if [[ -n "$PLUGIN_STAGES" ]]; then
-                    if ! echo "$PLUGIN_STAGES" | grep -qw "$STAGE"; then
-                        continue
-                    fi
-                fi
-            fi
-
-            plugin_dir=$(dirname "$pj")
-            FULL_PATH="$plugin_dir/$hook_script"
-
-            if [[ ! -f "$FULL_PATH" ]]; then
-                warn "$name: hook 脚本不存在: $FULL_PATH"
-                continue
-            fi
-
-            info "执行 $name.$HOOK_NAME: $FULL_PATH"
-            bash "$FULL_PATH" "$FEATURE" "$STAGE" || warn "$name.$HOOK_NAME 执行失败（非致命）"
-        done
+        CLI_ARGS=("$HOOK_NAME" "$FEATURE")
+        [[ -n "$STAGE" ]] && CLI_ARGS+=(--stage "$STAGE")
+        node "$REPO_ROOT/runtime/cli/run-plugin-hook.js" "${CLI_ARGS[@]}"
         ;;
 esac

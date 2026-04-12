@@ -6,7 +6,7 @@ const runtime = require('./lib/pipeline-runtime');
 function showHelp() {
   process.stdout.write(`Boss Harness - Artifact DAG 检查
 
-用法: check-artifact.sh <feature> <artifact> [options]
+用法: get-ready-artifacts.js <feature> <artifact> [options]
 
 检查指定产物在 DAG 中的就绪状态。
 
@@ -19,6 +19,10 @@ function showHelp() {
   --ready           列出所有当前可以开始的产物
   --dag <path>      指定 DAG 文件路径（默认 harness/artifact-dag.json）
   --json            JSON 格式输出
+
+示例:
+  get-ready-artifacts.js my-feature --ready --json
+  get-ready-artifacts.js my-feature architecture.md --can-start
 `);
 }
 
@@ -84,7 +88,7 @@ if (canStart) {
     exitError('--can-start 需要指定 artifact');
   }
   try {
-    const status = runtime._internal.getArtifactStatus(feature, artifact, {
+    const status = runtime.getArtifactStatus(feature, artifact, {
       cwd: process.cwd(),
       dagPath,
       ignoreSkipped: true
@@ -133,7 +137,7 @@ if (ready) {
 
 try {
   if (artifact) {
-    const status = runtime._internal.getArtifactStatus(feature, artifact, {
+    const status = runtime.getArtifactStatus(feature, artifact, {
       cwd: process.cwd(),
       dagPath
     });
@@ -145,15 +149,14 @@ try {
       process.stdout.write(`${artifact}: pending\n`);
     }
   } else {
-    const { dag } = runtime._internal.loadDagForFeature(process.cwd(), feature, dagPath);
-    for (const name of Object.keys(dag.artifacts || {})) {
-      const status = runtime._internal.getArtifactStatus(feature, name, {
-        cwd: process.cwd(),
-        dagPath
-      });
-      if (status.status === 'completed') {
+    const statuses = runtime.listArtifactStatuses(feature, {
+      cwd: process.cwd(),
+      dagPath
+    });
+    for (const { artifact: name, status } of statuses) {
+      if (status === 'completed') {
         process.stdout.write(`  ✅ ${name}\n`);
-      } else if (status.status === 'skipped') {
+      } else if (status === 'skipped') {
         process.stdout.write(`  ⏭️  ${name} (skipped)\n`);
       } else {
         process.stdout.write(`  ⏳ ${name}\n`);

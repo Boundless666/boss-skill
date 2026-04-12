@@ -187,6 +187,15 @@ function getArtifactStatus(feature, artifact, { cwd = process.cwd(), dagPath, ig
   return { status: 'blocked', missing };
 }
 
+function listArtifactStatuses(feature, { cwd = process.cwd(), dagPath } = {}) {
+  ensureFeatureName(feature);
+  const { dag } = loadDagForFeature(cwd, feature, dagPath);
+  return Object.keys(dag.artifacts || {}).map((artifact) => ({
+    artifact,
+    ...getArtifactStatus(feature, artifact, { cwd, dagPath })
+  }));
+}
+
 function initPipeline(feature, { cwd = process.cwd() } = {}) {
   ensureFeatureName(feature);
   const bossDir = path.join(cwd, '.boss', feature);
@@ -245,12 +254,19 @@ function initPipeline(feature, { cwd = process.cwd() } = {}) {
       totalDuration: null,
       stageTimings: {},
       gatePassRate: null,
-      retryTotal: 0
+      retryTotal: 0,
+      agentSuccessCount: 0,
+      agentFailureCount: 0,
+      meanRetriesPerStage: 0,
+      revisionLoopCount: 0,
+      pluginFailureCount: 0
     },
     plugins: [],
     pluginLifecycle: {
       discovered: [],
-      activated: []
+      activated: [],
+      executed: [],
+      failed: []
     },
     humanInterventions: [],
     revisionRequests: [],
@@ -756,6 +772,8 @@ function registerPlugins(feature, { cwd = process.cwd(), type } = {}) {
 module.exports = {
   initPipeline,
   getReadyArtifacts,
+  getArtifactStatus,
+  listArtifactStatuses,
   recordArtifact,
   updateStage,
   updateAgent,

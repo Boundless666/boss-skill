@@ -7,7 +7,7 @@ function showHelp() {
   process.stderr.write([
     'Boss Harness - Agent 状态更新',
     '',
-    '用法: update-agent.sh <feature> <stage> <agent-name> <status> [options]',
+    '用法: update-agent.js <feature> <stage> <agent-name> <status> [options]',
     '',
     '参数:',
     '  feature      功能名称',
@@ -19,8 +19,8 @@ function showHelp() {
     '  --reason <text>   失败原因（status=failed 时使用）',
     '',
     '示例:',
-    '  update-agent.sh my-feature 1 boss-pm running',
-    '  update-agent.sh my-feature 3 boss-qa failed --reason "测试覆盖率不足"',
+    '  update-agent.js my-feature 1 boss-pm running',
+    '  update-agent.js my-feature 3 boss-qa failed --reason "测试覆盖率不足"',
     ''
   ].join('\n'));
 }
@@ -36,6 +36,7 @@ let stage = '';
 let agent = '';
 let status = '';
 let reason = '';
+let jsonOutput = false;
 
 function requireOptionValue(flag, value) {
   if (!value || value.startsWith('-')) {
@@ -52,6 +53,10 @@ while (idx < args.length) {
     case '--reason':
       reason = requireOptionValue('--reason', args[idx + 1]);
       idx += 2;
+      break;
+    case '--json':
+      jsonOutput = true;
+      idx += 1;
       break;
     default:
       if (arg.startsWith('-')) {
@@ -93,7 +98,16 @@ if (!status) {
 
 try {
   runtime.updateAgent(feature, stage, agent, status, { reason, cwd: process.cwd() });
-  process.stdout.write(`Agent ${agent} (阶段 ${stage}): → ${status}\n`);
+  if (jsonOutput) {
+    process.stdout.write(JSON.stringify({
+      feature,
+      stage: Number(stage),
+      agent,
+      status
+    }) + '\n');
+  } else {
+    process.stdout.write(`Agent ${agent} (阶段 ${stage}): → ${status}\n`);
+  }
 } catch (err) {
   process.stderr.write(`${err.message}\n`);
   process.exit(1);

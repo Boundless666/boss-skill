@@ -26,6 +26,7 @@ function emitProgress(cwd, feature, event) {
   const entry = JSON.stringify({
     timestamp: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
     type: event.type,
+    feature,
     data: event.data || {}
   });
 

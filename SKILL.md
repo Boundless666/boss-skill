@@ -148,7 +148,7 @@ Copy this checklist and check off items as you complete them:
   - [ ] **D.10 回到 D.1**：重新查询就绪产物，直到 DAG 中所有非跳过产物都已完成
 
 - [ ] **收尾**
-  - [ ] F.1 📊 调用 `scripts/report/generate-summary.sh <feature>` 生成最终流水线报告
+  - [ ] F.1 📊 调用 `scripts/report/generate-summary.sh <feature>` 生成最终流水线报告（兼容入口，内部转调 `runtime/cli/generate-summary.js`）
   - [ ] F.2 输出最终结果（文档位置 + 测试摘要 + 门禁结果 + 访问 URL + 流水线耗时）
 
 ---
@@ -172,13 +172,13 @@ Copy this checklist and check off items as you complete them:
 | 脚本 | 用途 |
 |------|------|
 | `scripts/harness/update-stage.sh` | 原子化更新阶段状态（状态机转换 + 产物记录 + gate 判定） |
-| `scripts/harness/check-stage.sh` | 检查阶段状态、前置条件、重试可行性 |
+| `scripts/harness/check-stage.sh` | 兼容入口，转调 `runtime/cli/check-stage.js` 检查阶段状态、前置条件、重试可行性 |
 | `scripts/harness/retry-stage.sh` | 阶段重试（检查上限 → retrying → running） |
 | `scripts/harness/update-agent.sh` | Agent 级状态更新（running/completed/failed） |
 | `scripts/harness/retry-agent.sh` | 单个 Agent 重试（不重跑整个阶段） |
 | `scripts/harness/append-event.sh` | 追加事件到 events.jsonl（事件溯源） |
 | `scripts/harness/materialize-state.sh` | 从事件日志重建 execution.json |
-| `scripts/harness/replay-events.sh` | 事件回放与时间旅行调试 |
+| `scripts/harness/replay-events.sh` | 兼容入口，转调 `runtime/cli/replay-events.js` 做事件回放与时间旅行调试 |
 | `scripts/harness/detect-pack.sh` | Pipeline Pack 自动检测（匹配项目文件） |
 | `scripts/harness/watch-progress.sh` | 实时进度监控（tail -f progress.jsonl） |
 | `scripts/harness/check-artifact.sh` | Artifact DAG 就绪检查（`--can-start`/`--ready`） |
@@ -187,7 +187,7 @@ Copy this checklist and check off items as you complete them:
 | `scripts/gates/gate0-code-quality.sh` | Gate 0：代码质量（编译 + Lint） |
 | `scripts/gates/gate1-testing.sh` | Gate 1：测试门禁（覆盖率 + 通过率 + E2E） |
 | `scripts/gates/gate2-performance.sh` | Gate 2：性能门禁（Lighthouse + API P99） |
-| `scripts/report/generate-summary.sh` | 解析 execution.json 生成流水线报告 |
+| `scripts/report/generate-summary.sh` | 兼容入口，转调 `runtime/cli/generate-summary.js` 生成流水线报告 |
 | `scripts/harness/load-plugins.sh` | 扫描并加载已注册的 Harness 插件 |
 
 ### Runtime/CLI 编排对照
@@ -197,10 +197,27 @@ Copy this checklist and check off items as you complete them:
 | 编排动作 | Shell 入口（兼容层） | Runtime CLI | Runtime API |
 |---------|----------------------|-------------|-------------|
 | 初始化流水线 | `scripts/init-project.sh`（bootstrap：脚手架占位 + 调用 runtime init） | `runtime/cli/init-pipeline.js` | `initPipeline(feature)` |
+| 查询 ready artifacts | `scripts/harness/check-artifact.sh` | `runtime/cli/get-ready-artifacts.js` | `getReadyArtifacts(feature, options)` |
 | 阶段状态变更 | `scripts/harness/update-stage.sh` | `runtime/cli/update-stage.js` | `updateStage(feature, stage, status, options)` |
 | 记录产物 | 无直接稳定等价包装（`update-stage.sh --artifact` 为阶段更新附带记录） | `runtime/cli/record-artifact.js` | `recordArtifact(feature, artifact, stage)` |
 | Agent 状态变更 | `scripts/harness/update-agent.sh` | `runtime/cli/update-agent.js` | `updateAgent(feature, stage, agent, status, options)` |
 | 门禁评估 | `scripts/gates/gate-runner.sh` | `runtime/cli/evaluate-gates.js` | `evaluateGates(feature, gate, options)` |
+| 插件 Hook 执行 | `scripts/harness/load-plugins.sh --run-hook` | `runtime/cli/run-plugin-hook.js` | `runHook(hook, feature, options)` |
+| 阶段状态检查 | `scripts/harness/check-stage.sh` | `runtime/cli/check-stage.js` | `checkStage(feature, stage, options)` |
+| 事件回放 | `scripts/harness/replay-events.sh` | `runtime/cli/replay-events.js` | `replayEvents(feature, options)`, `replaySnapshot(feature, at, options)` |
+| Progress 诊断 | 无 | `runtime/cli/inspect-progress.js` | `inspectProgress(feature, options)` |
+| 生成流水线报告 | `scripts/report/generate-summary.sh` | `runtime/cli/generate-summary.js` | `buildSummaryModel(feature)`, `renderMarkdown(model)`, `renderJson(model)` |
+| 生成诊断页 | 无 | `runtime/cli/render-diagnostics.js` | `renderHtml(model)` |
+
+Pack 选择与插件生命周期都应进入事件流，而不是停留在 shell 日志里：
+- pack 应通过 `PackApplied` 进入 `execution.json` read model。
+- 插件发现/激活应通过 `PluginDiscovered` / `PluginActivated` 进入 `pluginLifecycle`。
+- 插件 hook 执行应通过 `PluginHookExecuted` / `PluginHookFailed` 进入 `pluginLifecycle`。
+
+报告生成也应走 runtime，而不是在 shell 中直接拼接状态：
+- `runtime/report/summary-model.js` 从 `execution.json` 构建统一 summary model。
+- `runtime/report/render-markdown.js` / `runtime/report/render-json.js` 负责不同输出格式。
+- `runtime/report/render-html.js` 负责最小 HTML 诊断页。
 
 ## Claude Code Hooks（Agent 生命周期集成）
 

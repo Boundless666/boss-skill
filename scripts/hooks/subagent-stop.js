@@ -6,6 +6,38 @@ const { findActiveFeature, readExecJson, AGENT_STAGE_MAP } = require('../lib/bos
 const { emitProgress } = require('../lib/progress-emitter');
 const { execSync } = require('child_process');
 
+function parseStructuredStatus(message) {
+  const match = message.match(/\[BOSS_STATUS\]([\s\S]*?)\[\/BOSS_STATUS\]/i);
+  if (!match) {
+    return null;
+  }
+
+  const block = match[1];
+  const statusMatch = block.match(/^\s*status\s*:\s*([A-Z_]+)\s*$/im);
+  if (!statusMatch) {
+    return null;
+  }
+
+  const reasonMatch = block.match(/^\s*reason\s*:\s*(.*?)\s*$/im);
+  return {
+    status: statusMatch[1],
+    reason: reasonMatch ? reasonMatch[1] : ''
+  };
+}
+
+function parseStatus(message) {
+  const structured = parseStructuredStatus(message);
+  if (structured) {
+    return structured;
+  }
+
+  const statusMatch = message.match(/\b(REVISION_NEEDED|DONE_WITH_CONCERNS|DONE|BLOCKED|NEEDS_CONTEXT)\b/);
+  return {
+    status: statusMatch ? statusMatch[1] : '',
+    reason: ''
+  };
+}
+
 function run(rawInput) {
   const input = JSON.parse(rawInput);
   const agentType = input.agent_type || '';
@@ -30,12 +62,15 @@ function run(rawInput) {
   const logFile = path.join(logDir, 'agent-log.jsonl');
   const now = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 
+  const parsedStatus = parseStatus(lastMsg);
   const entry = JSON.stringify({
     timestamp: now,
     agentType,
     agentId,
     event: 'stop',
-    summary: lastMsg
+    summary: lastMsg,
+    status: parsedStatus.status || '',
+    reason: parsedStatus.reason || ''
   });
 
   try {
@@ -59,9 +94,7 @@ function run(rawInput) {
       }
 
       if (currentStage) {
-        // Parse status from last message: look for DONE, DONE_WITH_CONCERNS, BLOCKED, NEEDS_CONTEXT, REVISION_NEEDED
-        const statusMatch = lastMsg.match(/\b(REVISION_NEEDED|DONE_WITH_CONCERNS|DONE|BLOCKED|NEEDS_CONTEXT)\b/);
-        const agentStatus = statusMatch && (statusMatch[1] === 'DONE' || statusMatch[1] === 'DONE_WITH_CONCERNS')
+        const agentStatus = parsedStatus.status && (parsedStatus.status === 'DONE' || parsedStatus.status === 'DONE_WITH_CONCERNS')
           ? 'completed' : 'failed';
 
         emitProgress(cwd, active.feature, {
@@ -69,8 +102,9 @@ function run(rawInput) {
           data: { agent: agentType, stage: parseInt(currentStage), status: agentStatus }
         });
 
-        const reasonArg = agentStatus === 'failed' && statusMatch
-          ? ` --reason "${statusMatch[1]}"` : '';
+        const failureReason = parsedStatus.reason || parsedStatus.status || '';
+        const reasonArg = agentStatus === 'failed' && failureReason
+          ? ` --reason "${failureReason}"` : '';
 
         try {
           const scriptPath = path.join(__dirname, '..', 'harness', 'update-agent.sh');
@@ -89,4 +123,7 @@ function run(rawInput) {
   return '';
 }
 
-module.exports = { run };
+module.exports = {
+  run,
+  parseStatus
+};

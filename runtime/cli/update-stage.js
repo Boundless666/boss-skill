@@ -9,7 +9,7 @@ function showHelp() {
   process.stderr.write([
     'Boss Harness - 阶段状态更新',
     '',
-    '用法: update-stage.sh <feature> <stage> <status> [options]',
+    '用法: update-stage.js <feature> <stage> <status> [options]',
     '',
     '参数:',
     '  feature   功能名称',
@@ -24,10 +24,10 @@ function showHelp() {
     '  --gate-failed          标记 gate 未通过',
     '',
     '示例:',
-    '  update-stage.sh my-feature 1 running',
-    '  update-stage.sh my-feature 1 completed --artifact prd.md --artifact architecture.md',
-    '  update-stage.sh my-feature 3 failed --reason "单元测试覆盖率不足"',
-    '  update-stage.sh my-feature 3 completed --gate gate1 --gate-passed',
+    '  update-stage.js my-feature 1 running',
+    '  update-stage.js my-feature 1 completed --artifact prd.md --artifact architecture.md',
+    '  update-stage.js my-feature 3 failed --reason "单元测试覆盖率不足"',
+    '  update-stage.js my-feature 3 completed --gate gate1 --gate-passed',
     ''
   ].join('\n'));
 }
@@ -57,6 +57,7 @@ let reason = '';
 const artifacts = [];
 let gate = '';
 let gatePassed = null;
+let jsonOutput = false;
 
 function requireOptionValue(flag, value) {
   if (!value || value.startsWith('-')) {
@@ -88,6 +89,10 @@ while (idx < args.length) {
       break;
     case '--gate-failed':
       gatePassed = false;
+      idx += 1;
+      break;
+    case '--json':
+      jsonOutput = true;
       idx += 1;
       break;
     default:
@@ -133,8 +138,18 @@ try {
     gatePassed
   });
 
-  process.stdout.write(`阶段 ${stage}: ${currentStatus} → ${status}\n`);
-  process.stdout.write(`文件: .boss/${feature}/.meta/execution.json\n`);
+  if (jsonOutput) {
+    process.stdout.write(JSON.stringify({
+      feature,
+      stage: Number(stage),
+      previousStatus: currentStatus,
+      status,
+      executionPath: `.boss/${feature}/.meta/execution.json`
+    }) + '\n');
+  } else {
+    process.stdout.write(`阶段 ${stage}: ${currentStatus} → ${status}\n`);
+    process.stdout.write(`文件: .boss/${feature}/.meta/execution.json\n`);
+  }
 } catch (err) {
   process.stderr.write(`${err.message}\n`);
   process.exit(1);
