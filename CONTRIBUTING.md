@@ -10,17 +10,20 @@ git clone https://github.com/echoVic/boss-skill.git
 cd boss-skill
 
 # 确认 Node.js 版本
-node -v  # >= 16
+node -v  # >= 20
 
 # 安装 jq（Shell 脚本依赖）
 brew install jq        # macOS
 sudo apt install jq    # Ubuntu/Debian
 
-# 运行测试
+# 安装依赖并验证
+npm install
+npm run build
+npm run typecheck
 npm test
 ```
 
-本项目零 npm 依赖，克隆即可开发，无需 `npm install`。
+运行时代码保持 Node.js 内置模块优先；开发工具链使用 TypeScript 与 Vitest。
 
 ## 项目结构概览
 
@@ -36,7 +39,9 @@ npm test
 | `docs/` | runtime contract、实施计划等设计/迁移文档 |
 | `templates/` | 产物模板 |
 | `test/` | 自动化测试 |
-| `bin/boss-skill.js` | CLI 入口 |
+| `src/` | CLI/runtime 的 TypeScript/ESM 源码 |
+| `dist/` | 构建后的发布产物 |
+| `runtime/` | 指向 `dist/` 的兼容 wrapper 与稳定入口 |
 
 ## 开发规范
 
@@ -78,11 +83,9 @@ try {
 }
 ```
 
-### 零依赖原则
+### 运行时依赖原则
 
-本项目不使用任何第三方 npm 依赖。所有代码仅使用 Node.js 内置模块（`fs`、`path`、`os`、`child_process`）。
-
-新增功能时请遵守此约束，包括测试框架（使用 `node:test` + `node:assert`）。
+运行时代码应继续优先使用 Node.js 内置模块（`fs`、`path`、`os`、`child_process`）。开发期工具链允许使用现有的 TypeScript/Vitest 依赖，但不要为运行时路径引入新的第三方依赖。
 
 ### Runtime 优先原则
 
@@ -95,35 +98,36 @@ try {
 ### 运行测试
 
 ```bash
+npm run build
+npm run typecheck
 npm test
 ```
 
-测试使用 Node.js 内置的 `node:test` 框架，位于 `test/` 目录。
+测试使用 Vitest，位于 `test/` 目录。
 
 ### 编写测试
 
-- 测试文件命名：`test/<分类>/<模块名>.test.js`
-- 使用 `test/helpers/fixtures.js` 创建临时 `.boss/` 目录结构
+- 测试文件命名：`test/<分类>/<模块名>.test.ts`
+- 使用 `test/helpers/fixtures.ts` 创建临时 `.boss/` 目录结构
 - Hook 测试通过直接调用 `run()` 函数，传入模拟的 JSON 输入
 
-```javascript
-const { describe, it, afterEach } = require('node:test');
-const assert = require('node:assert/strict');
-const { createTempBossDir, createExecData, cleanupTempDir } = require('../helpers/fixtures');
+```ts
+import { afterEach, describe, expect, it } from 'vitest';
+import { cleanupTempDir, createExecData, createTempBossDir } from '../helpers/fixtures.js';
 
 describe('my-hook', () => {
-  let tmpDir;
+  let tmpDir: string | null = null;
 
   afterEach(() => {
     if (tmpDir) { cleanupTempDir(tmpDir); tmpDir = null; }
   });
 
-  it('handles normal input', () => {
+  it('handles normal input', async () => {
     const execData = createExecData({ feature: 'test', status: 'running' });
     tmpDir = createTempBossDir('test', execData);
-    const hook = require('../../scripts/hooks/my-hook');
+    const hook = await import('../../scripts/hooks/my-hook.js');
     const result = hook.run(JSON.stringify({ cwd: tmpDir }));
-    assert.ok(result);
+    expect(result).toBeTruthy();
   });
 });
 ```
@@ -134,7 +138,7 @@ describe('my-hook', () => {
 
 - 新增的 Hook 脚本有对应的测试
 - 新增的 `scripts/lib/` 工具函数有对应的测试
-- CLI 功能变更在 `test/bin/boss-skill.test.js` 中覆盖
+- CLI 功能变更在 `test/bin/boss-skill.test.ts` 中覆盖
 
 ## 版本号
 

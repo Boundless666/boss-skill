@@ -34,6 +34,7 @@
     "automation"
   ],
   "files": [
+    "dist/",
     "agents/",
     "commands/",
     "harness/",
@@ -44,7 +45,6 @@
     "skills/",
     ".claude/",
     ".claude-plugin/",
-    "bin/",
     "SKILL.md",
     "DESIGN.md"
   ],

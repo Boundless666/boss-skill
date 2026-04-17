@@ -32,7 +32,7 @@ describe('boss-skill dist bin', () => {
     expect(pkg.type).toBe('module');
     expect(pkg.bin['boss-skill']).toBe('dist/bin/boss-skill.js');
     expect(pkg.engines.node).toBe('>=20');
-    expect(pkg.files).not.toContain('dist/');
+    expect(pkg.files).toContain('dist/');
   });
 
   it('prints help from the built dist entrypoint', () => {

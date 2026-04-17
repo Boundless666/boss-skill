@@ -40,7 +40,7 @@ npm update -g @blade-ai/boss-skill && boss-skill
 
 或在 Claude Code 中使用 `/boss:upgrade` 命令。
 
-发布与迁移说明见 [CHANGELOG.md](./CHANGELOG.md)；runtime 行为契约见 [docs/runtime-contract.md](./docs/runtime-contract.md)。
+发布与迁移说明见 [CHANGELOG.md](./CHANGELOG.md)。
 
 ## 工作原理
 
@@ -230,7 +230,7 @@ Boss 支持项目级模板覆盖：
 
 ### 环境要求
 
-- Node.js >= 16
+- Node.js >= 20
 - jq（Shell 脚本依赖，`brew install jq`）
 
 ### 安装与测试
@@ -238,8 +238,18 @@ Boss 支持项目级模板覆盖：
 ```bash
 git clone https://github.com/echoVic/boss-skill.git
 cd boss-skill
+npm install
+npm run build
+npm run typecheck
 npm test
 ```
+
+### 源码与产物布局
+
+- `src/` 是 CLI 和 runtime 的 TypeScript/ESM 源码入口。
+- `dist/` 是 `npm publish` 和包内 `bin` 指向的构建产物，不要手改。
+- `runtime/cli/*.js` 与 `runtime/cli/lib/*.js` 保留为稳定的 ESM wrapper，供 shell/hook 入口继续调用。
+- `npm test` 运行 Vitest；测试文件统一放在 `test/**/*.test.ts`。
 
 ### 发布
 
