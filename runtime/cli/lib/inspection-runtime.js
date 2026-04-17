@@ -144,6 +144,20 @@ function getRecentFailures(execution) {
   return failures;
 }
 
+function readFeatureSummary(feature, cwd = process.cwd()) {
+  try {
+    const memoryRuntime = require('./memory-runtime');
+    return memoryRuntime.readFeatureSummary(feature, { cwd });
+  } catch {
+    return {
+      feature,
+      generatedAt: null,
+      startupSummary: [],
+      agentSections: {}
+    };
+  }
+}
+
 function inspectPipeline(feature, { cwd = process.cwd() } = {}) {
   ensureFeatureName(feature);
   const execution = readExecution(feature, cwd);
@@ -157,6 +171,7 @@ function inspectPipeline(feature, { cwd = process.cwd() } = {}) {
     readyArtifacts,
     activeAgents,
     recentFailures: getRecentFailures(execution),
+    memory: readFeatureSummary(feature, cwd),
     pack: {
       name: execution.parameters && execution.parameters.pipelinePack ? execution.parameters.pipelinePack : 'default',
       version: execution.parameters && execution.parameters.pipelinePackVersion ? execution.parameters.pipelinePackVersion : ''

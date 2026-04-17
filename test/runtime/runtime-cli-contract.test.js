@@ -144,4 +144,51 @@ describe('runtime CLI contract', () => {
     assert.equal(diagnosticsHelp.status, 0);
     assert.match(diagnosticsHelp.stdout + diagnosticsHelp.stderr, /用法: render-diagnostics\.js <feature>/);
   });
+
+  it('extract-memory, query-memory, and build-memory-summary expose help text', () => {
+    const EXTRACT_MEMORY_CLI = path.join(REPO_ROOT, 'runtime', 'cli', 'extract-memory.js');
+    const QUERY_MEMORY_CLI = path.join(REPO_ROOT, 'runtime', 'cli', 'query-memory.js');
+    const BUILD_MEMORY_SUMMARY_CLI = path.join(REPO_ROOT, 'runtime', 'cli', 'build-memory-summary.js');
+
+    const extractHelp = runCli(EXTRACT_MEMORY_CLI, ['--help']);
+    assert.equal(extractHelp.status, 0);
+    assert.match(extractHelp.stdout + extractHelp.stderr, /用法: extract-memory\.js <feature>/);
+
+    const queryHelp = runCli(QUERY_MEMORY_CLI, ['--help']);
+    assert.equal(queryHelp.status, 0);
+    assert.match(queryHelp.stdout + queryHelp.stderr, /用法: query-memory\.js <feature>/);
+
+    const summaryHelp = runCli(BUILD_MEMORY_SUMMARY_CLI, ['--help']);
+    assert.equal(summaryHelp.status, 0);
+    assert.match(summaryHelp.stdout + summaryHelp.stderr, /用法: build-memory-summary\.js <feature>/);
+  });
+
+  it('query-memory emits stable json payloads for startup summaries', () => {
+    const runtime = require('../../runtime/cli/lib/memory-runtime');
+    runtime.writeFeatureMemory('test-feat', [{
+      id: 'm1',
+      scope: 'feature',
+      kind: 'execution',
+      category: 'historical_risk',
+      summary: 'Stage 3 is unstable',
+      source: { type: 'events' },
+      evidence: [{ type: 'event', ref: '2' }],
+      tags: ['stage3'],
+      confidence: 0.8,
+      createdAt: '2026-04-17T00:00:00Z',
+      lastSeenAt: '2026-04-17T00:00:00Z',
+      expiresAt: null,
+      decayScore: 10,
+      influence: 'preference'
+    }], { cwd: tmpDir });
+    runtime.buildFeatureSummary('test-feat', { cwd: tmpDir });
+
+    const QUERY_MEMORY_CLI = path.join(REPO_ROOT, 'runtime', 'cli', 'query-memory.js');
+    const result = runCli(QUERY_MEMORY_CLI, ['test-feat', '--startup', '--json']);
+    assert.equal(result.status, 0, result.stderr);
+
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.feature, 'test-feat');
+    assert.equal(payload.startupSummary[0].summary, 'Stage 3 is unstable');
+  });
 });

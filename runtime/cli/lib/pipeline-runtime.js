@@ -312,6 +312,7 @@ function initPipeline(feature, { cwd = process.cwd() } = {}) {
   }
   fs.writeFileSync(eventsFile, `${events.map((event) => JSON.stringify(event)).join('\n')}\n`, 'utf8');
   const { state } = materializeState(feature, cwd);
+  refreshMemory(feature, cwd);
   return state;
 }
 
@@ -338,6 +339,17 @@ function appendRuntimeEvent(cwd, feature, eventType, data = {}) {
     timestamp: new Date().toISOString(),
     data
   });
+}
+
+function refreshMemory(feature, cwd) {
+  try {
+    const memoryRuntime = require('./memory-runtime');
+    memoryRuntime.rebuildFeatureMemory(feature, { cwd });
+    memoryRuntime.rebuildGlobalMemory({ cwd });
+    memoryRuntime.buildFeatureSummary(feature, { cwd });
+  } catch (err) {
+    process.stderr.write(`[boss-skill] memory refresh skipped: ${err.message}\n`);
+  }
 }
 
 function recordArtifact(feature, artifact, stage, { cwd = process.cwd() } = {}) {
@@ -371,6 +383,7 @@ function recordArtifact(feature, artifact, stage, { cwd = process.cwd() } = {}) 
   });
 
   const { state } = materializeState(feature, cwd);
+  refreshMemory(feature, cwd);
   return state;
 }
 
@@ -510,6 +523,7 @@ function updateStage(feature, stage, status, {
   }
 
   const { state } = materializeState(feature, cwd);
+  refreshMemory(feature, cwd);
   return state;
 }
 
@@ -535,6 +549,7 @@ function updateAgent(feature, stage, agent, status, {
   });
 
   const { state } = materializeState(feature, cwd);
+  refreshMemory(feature, cwd);
   return state;
 }
 
@@ -671,6 +686,7 @@ function evaluateGates(feature, gateName, { cwd = process.cwd(), dryRun = false,
   });
 
   const { state } = materializeState(feature, cwd);
+  refreshMemory(feature, cwd);
   return {
     gate: gateName,
     passed,

@@ -144,4 +144,32 @@ describe('inspection runtime CLIs', () => {
     assert.equal(payload.events[0].feature, 'test-feat');
     assert.equal(payload.events[0].type, 'agent-start');
   });
+
+  it('inspect-pipeline includes startup memory summary when available', () => {
+    const memoryRuntime = require('../../runtime/cli/lib/memory-runtime');
+    const runtime = require('../../runtime/cli/lib/pipeline-runtime');
+    const { inspectPipeline } = require('../../runtime/cli/lib/inspection-runtime');
+
+    runtime.initPipeline('test-feat', { cwd: tmpDir });
+    memoryRuntime.writeFeatureMemory('test-feat', [{
+      id: 'm1',
+      scope: 'feature',
+      kind: 'execution',
+      category: 'historical_risk',
+      summary: 'Stage 3 is unstable',
+      source: { type: 'events' },
+      evidence: [{ type: 'event', ref: '2' }],
+      tags: ['stage3'],
+      confidence: 0.9,
+      createdAt: '2026-04-17T00:00:00Z',
+      lastSeenAt: '2026-04-17T00:00:00Z',
+      expiresAt: null,
+      decayScore: 10,
+      influence: 'preference'
+    }], { cwd: tmpDir });
+    memoryRuntime.buildFeatureSummary('test-feat', { cwd: tmpDir });
+
+    const payload = inspectPipeline('test-feat', { cwd: tmpDir });
+    assert.equal(payload.memory.startupSummary[0].summary, 'Stage 3 is unstable');
+  });
 });

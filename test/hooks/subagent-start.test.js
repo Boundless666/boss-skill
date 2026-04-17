@@ -41,4 +41,44 @@ describe('subagent-start hook', () => {
     assert.ok(parsed.hookSpecificOutput.additionalContext.includes('code'));
     assert.ok(parsed.hookSpecificOutput.additionalContext.includes('BOSS_STATUS'));
   });
+
+  it('includes a memory section when relevant memories exist for the agent stage', () => {
+    const memoryRuntime = require('../../runtime/cli/lib/memory-runtime');
+    const execData = createExecData({
+      feature: 'test-feat',
+      status: 'running',
+      stages: {
+        '1': { name: 'Planning', status: 'completed', artifacts: [] },
+        '2': { name: 'Review', status: 'completed', artifacts: [], agents: {} },
+        '3': { name: 'Development', status: 'running', artifacts: [], agents: { 'boss-backend': { status: 'pending' } } },
+        '4': { name: 'Deployment', status: 'pending', artifacts: [] }
+      }
+    });
+    tmpDir = createTempBossDir('test-feat', execData);
+    memoryRuntime.writeFeatureMemory('test-feat', [{
+      id: 'm1',
+      scope: 'feature',
+      kind: 'execution',
+      category: 'agent_failure_pattern',
+      feature: 'test-feat',
+      stage: 3,
+      agent: 'boss-backend',
+      summary: 'Backend timed out in stage 3',
+      source: { type: 'events' },
+      evidence: [{ type: 'event', ref: '5' }],
+      tags: ['boss-backend'],
+      confidence: 0.9,
+      createdAt: '2026-04-17T00:00:00Z',
+      lastSeenAt: '2026-04-17T00:00:00Z',
+      expiresAt: null,
+      decayScore: 10,
+      influence: 'preference'
+    }], { cwd: tmpDir });
+    memoryRuntime.buildFeatureSummary('test-feat', { cwd: tmpDir });
+
+    const result = hook.run(JSON.stringify({ cwd: tmpDir, agent_type: 'boss-backend' }));
+    const parsed = JSON.parse(result);
+    assert.match(parsed.hookSpecificOutput.additionalContext, /记忆提示/);
+    assert.match(parsed.hookSpecificOutput.additionalContext, /Backend timed out in stage 3/);
+  });
 });

@@ -3,6 +3,24 @@
 const { findActiveFeature, readExecJson, AGENT_STAGE_MAP } = require('../lib/boss-utils');
 const { emitProgress } = require('../lib/progress-emitter');
 const runtime = require('../../runtime/cli/lib/pipeline-runtime');
+const memoryRuntime = require('../../runtime/cli/lib/memory-runtime');
+
+function buildMemoryContext(feature, agentType, stage, cwd) {
+  try {
+    const section = memoryRuntime.queryAgentSection(feature, {
+      cwd,
+      agent: agentType,
+      stage: Number(stage),
+      limit: 3
+    });
+    if (!section.length) {
+      return '';
+    }
+    return '\n记忆提示:\n' + section.map((item) => `- [${item.category}] ${item.summary}`).join('\n');
+  } catch {
+    return '';
+  }
+}
 
 function run(rawInput) {
   const input = JSON.parse(rawInput);
@@ -47,6 +65,7 @@ function run(rawInput) {
     context += `, 活跃阶段: ${currentStage} (${stageName})`;
   }
   context += `\n子 Agent 类型: ${agentType}`;
+  context += buildMemoryContext(active.feature, agentType, currentStage, cwd);
   context += '\n请在最终消息中附带固定状态块：';
   context += '\n[BOSS_STATUS]';
   context += '\nstatus: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED';

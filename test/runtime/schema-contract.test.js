@@ -98,4 +98,42 @@ describe('runtime schema contract', () => {
       ['exitCode', 'hook', 'plugin']
     );
   });
+
+  it('memory record schema requires traceable evidence and decay fields', () => {
+    const schema = loadJson('runtime/schema/memory-record-schema.json');
+
+    assert.deepEqual(
+      schema.required.slice().sort(),
+      [
+        'category',
+        'confidence',
+        'createdAt',
+        'decayScore',
+        'evidence',
+        'expiresAt',
+        'id',
+        'influence',
+        'kind',
+        'lastSeenAt',
+        'scope',
+        'source',
+        'summary',
+        'tags'
+      ]
+    );
+    assert.deepEqual(schema.properties.scope.enum, ['global', 'feature']);
+    assert.deepEqual(schema.properties.kind.enum, ['execution', 'long_term']);
+    assert.deepEqual(schema.properties.influence.enum, ['preference']);
+  });
+
+  it('memory summary schema documents startup and agent injection views', () => {
+    const schema = loadJson('runtime/schema/memory-summary-schema.json');
+
+    assert.deepEqual(
+      schema.required.slice().sort(),
+      ['agentSections', 'feature', 'generatedAt', 'startupSummary']
+    );
+    assert.equal(schema.properties.startupSummary.type, 'array');
+    assert.equal(schema.properties.agentSections.type, 'object');
+  });
 });

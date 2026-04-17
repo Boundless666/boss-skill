@@ -57,6 +57,7 @@ function renderText(summary) {
   process.stdout.write(`activeAgents: ${summary.activeAgents.map((item) => `${item.agent}@${item.stage}`).join(', ') || 'none'}\n`);
   process.stdout.write(`pack: ${summary.pack.name}\n`);
   process.stdout.write(`plugins: ${summary.plugins.active.map((plugin) => plugin.name).join(', ') || 'none'}\n`);
+  process.stdout.write(`memoryStartup: ${(summary.memory && summary.memory.startupSummary || []).map((item) => item.summary).join(' | ') || 'none'}\n`);
 }
 
 function run(argv = process.argv.slice(2), { cwd = process.cwd() } = {}) {
