@@ -19,28 +19,35 @@ CLI 自动检测已安装的 Coding Agent，一条命令全部搞定：
 ```
 Detected 4 agent(s):
 
-  ✅ OpenClaw: ~/.openclaw/skills/boss       (copy + inject metadata)
-  ✅ Codex: ~/.codex/skills/boss             (copy + inject metadata)
-  ✅ Antigravity: ~/.gemini/.../skills/boss   (copy + inject metadata)
-  ✅ Claude Code: 8 hook events → .claude/settings.json
+  ✅ OpenClaw: ~/.openclaw/skills/boss       (copied + metadata injected)
+  ✅ Codex: ~/.codex/skills/boss             (copied + metadata injected)
+  ✅ Antigravity: ~/.gemini/.../skills/boss   (copied + metadata injected)
+  ✅ Claude Code: plugin ready at /path/to/boss-skill
+     Use:  claude --plugin-dir "$(boss-skill path)"
 ```
 
-| Agent | 检测条件 | 安装目标 | 安装方式 |
-|-------|---------|---------|---------|
-| **OpenClaw** | `~/.openclaw/` 存在 | `~/.openclaw/skills/boss/` | 复制 + 注入 `metadata.openclaw` |
-| **Codex** | `~/.codex/` 存在 | `~/.codex/skills/boss/` | 复制 + 注入 `metadata.codex` |
-| **Antigravity** | `~/.gemini/antigravity/` 存在 | `~/.gemini/antigravity/skills/boss/` | 复制 + 注入 `metadata.antigravity` |
-| **Claude Code** | 始终安装 | `.claude/settings.json` | 合并 hooks 配置 |
+| Agent | 检测条件 | 安装方式 |
+|-------|---------|---------|
+| **OpenClaw** | `~/.openclaw/` 存在 | 复制到 `~/.openclaw/skills/boss/` + 注入 `metadata.openclaw` |
+| **Codex** | `~/.codex/` 存在 | 复制到 `~/.codex/skills/boss/` + 注入 `metadata.codex` |
+| **Antigravity** | `~/.gemini/antigravity/` 存在 | 复制到 `~/.gemini/antigravity/skills/boss/` + 注入 `metadata.antigravity` |
+| **Claude Code** | 始终 | Plugin 模式 — `claude --plugin-dir "$(boss-skill path)"` |
+
+### Claude Code 使用
+
+Claude Code 采用原生 Plugin 架构，无需复制文件到项目：
+
+```bash
+claude --plugin-dir "$(boss-skill path)"
+```
+
+启动后即可使用 `/boss` 命令、9 个 Agent、所有 hooks 和 skills。
 
 升级：
 
 ```bash
-npm update -g @blade-ai/boss-skill && boss-skill
+npm update -g @blade-ai/boss-skill
 ```
-
-或在 Claude Code 中使用 `/boss:upgrade` 命令。
-
-发布与迁移说明见 [CHANGELOG.md](./CHANGELOG.md)。
 
 ## 工作原理
 
@@ -279,8 +286,12 @@ npm run release -- 3.5.0 --no-publish
 
 ```
 boss-skill/
-├── bin/
-│   └── boss-skill.js                 # CLI 入口（auto-detect + metadata 注入）
+├── src/
+│   └── bin/
+│       └── boss-skill.ts                # CLI TypeScript 源码
+├── dist/
+│   └── bin/
+│       └── boss-skill.js                # CLI 编译产物（npm bin）
 ├── SKILL.md                          # 核心编排流程（通用 frontmatter，无平台 metadata）
 ├── skills/
 │   └── brainstorming/
@@ -296,90 +307,30 @@ boss-skill/
 │   ├── boss-qa.md
 │   ├── boss-devops.md
 │   └── prompts/                      # 子代理 Prompt 模板
-│       ├── implementer-prompt.md
-│       ├── spec-reviewer-prompt.md
-│       ├── code-quality-reviewer-prompt.md
-│       └── subagent-protocol.md
-├── commands/                         # Claude Code 斜杠命令
-│   ├── boss.md                       # /boss 命令
-│   └── boss-upgrade.md               # /boss:upgrade 升级命令
+├── commands/                         # 斜杠命令（/boss、/boss:upgrade）
+│   ├── boss.md
+│   └── boss-upgrade.md
+├── hooks/
+│   └── hooks.json                    # Claude Code Plugin hooks（使用 ${CLAUDE_PLUGIN_ROOT}）
 ├── harness/                          # 流水线编排与插件系统
 │   ├── plugin-schema.json
 │   ├── plugins/
 │   │   └── security-audit/
 │   └── pipeline-packs/               # 4 套流水线预设
-│       ├── default/
-│       ├── core/
-│       ├── api-only/
-│       └── solana-contract/
 ├── runtime/                          # Canonical runtime surface
-│   ├── cli/
-│   │   ├── init-pipeline.js
-│   │   ├── get-ready-artifacts.js
-│   │   ├── record-artifact.js
-│   │   ├── update-stage.js
-│   │   ├── update-agent.js
-│   │   ├── evaluate-gates.js
-│   │   ├── run-plugin-hook.js
-│   │   ├── check-stage.js
-│   │   ├── replay-events.js
-│   │   ├── inspect-pipeline.js
-│   │   ├── inspect-events.js
-│   │   ├── inspect-progress.js
-│   │   ├── inspect-plugins.js
-│   │   ├── generate-summary.js
-│   │   └── render-diagnostics.js
-│   └── report/
-│       ├── summary-model.js
-│       ├── render-markdown.js
-│       ├── render-json.js
-│       └── render-html.js
+│   ├── cli/                          # Runtime CLI 编排命令
+│   └── report/                       # 报告生成器
 ├── references/                       # 按需加载的规范文档
-│   ├── bmad-methodology.md
-│   ├── artifact-guide.md
-│   ├── testing-standards.md
-│   └── quality-gate.md
 ├── templates/                        # 7 个产物模板
 ├── scripts/
 │   ├── release.js                    # 统一发布脚本
-│   ├── init-project.sh               # 项目初始化
-│   ├── resolve-template.sh           # 模板路径解析
-│   ├── prepare-artifact.sh           # 产物骨架准备
-│   ├── lib/                          # 共享库
-│   │   ├── common.sh                 # Shell 通用函数（颜色、日志、校验、日期）
-│   │   ├── boss-utils.js             # Node.js 工具函数
-│   │   ├── hook-flags.js             # Hook Profile 门控
-│   │   └── run-with-flags.js         # Hook 统一调度中间件
+│   ├── lib/                          # 共享库（run-with-flags、hook-flags、boss-utils）
 │   ├── hooks/                        # 10 个 Node.js Hook 脚本
-│   │   ├── session-start.js
-│   │   ├── session-resume.js
-│   │   ├── pre-tool-write.js
-│   │   ├── post-tool-write.js
-│   │   ├── post-tool-bash.js
-│   │   ├── subagent-start.js
-│   │   ├── subagent-stop.js
-│   │   ├── on-stop.js
-│   │   ├── on-notification.js
-│   │   └── session-end.js
 │   ├── harness/                      # 事件追加、物化、重试等辅助脚本
 │   ├── gates/                        # 具体 gate 实现脚本
 │   └── report/                       # 报告相关脚本
-├── test/                             # 自动化测试
-│   ├── helpers/
-│   │   └── fixtures.js
-│   ├── lib/
-│   │   ├── hook-flags.test.js
-│   │   └── boss-utils.test.js
-│   ├── hooks/
-│   │   ├── session-start.test.js
-│   │   ├── pre-tool-write.test.js
-│   │   └── on-stop.test.js
-│   └── bin/
-│       └── boss-skill.test.js
-├── .claude/
-│   └── settings.json                 # Claude Code hooks 配置
 ├── .claude-plugin/
-│   ├── plugin.json
+│   ├── plugin.json                   # Claude Code Plugin 清单
 │   └── marketplace.json
 └── package.json
 ```
